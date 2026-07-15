@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     amap_js_key: str = ""
     public_base_url: str = "http://localhost:8000"
     map_output_dir: str = "static/maps"
+    api_key: str = ""  # 默认空，未配置时不强制鉴权（兼容本地开发）
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

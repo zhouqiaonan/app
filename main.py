@@ -1,19 +1,13 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.agent import run_map_agent
 from app.config import get_settings
-from app.services.feishu_events import (
-    extract_text_message,
-    is_url_verification,
-    verify_token,
-)
-from app.services.feishu_message import FeishuMessenger
-from app.services.message_parser import parse_map_command
+from app.services.auth import verify_api_key
 from app.tools.feishu_tool import FeishuClient
 
 settings = get_settings()
@@ -34,7 +28,10 @@ def health():
 
 
 @app.post("/agent/run")
-def manual_run(request: ManualRunRequest):
+def manual_run(
+    request: ManualRunRequest,
+    _auth: None = Depends(verify_api_key),
+):
     result = run_map_agent(app_token=request.app_token, table_id=request.table_id)
     if result.error:
         raise HTTPException(status_code=500, detail=result.error)
@@ -47,37 +44,73 @@ def manual_run(request: ManualRunRequest):
     }
 
 
-@app.post("/feishu/events")
-async def feishu_events(request: Request):
-    payload = await request.json()
-
-    if is_url_verification(payload):
-        return {"challenge": payload["challenge"]}
-
-    try:
-        verify_token(payload, settings.feishu_verification_token)
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-    chat_id, text = extract_text_message(payload)
-    if "生成地图" not in text:
-        return JSONResponse({"code": 0, "msg": "ignored"})
-
-    feishu_client = FeishuClient(settings.feishu_app_id, settings.feishu_app_secret)
-    messenger = FeishuMessenger(feishu_client)
-
-    try:
-        command = parse_map_command(text)
-        result = run_map_agent(command.app_token, command.table_id)
-        if result.error:
-            reply = f"地图生成失败：{result.error}"
-        else:
-            url = f"{settings.public_base_url.rstrip('/')}/maps/{result.task_id}.html"
-            reply = f"地图已生成：{url}\n有效地点：{result.success_count}"
-    except Exception as exc:
-        reply = f"地图生成失败：{exc}"
-
-    if chat_id:
-        messenger.send_text(chat_id, reply)
-
-    return {"code": 0}
+@app.get("/agent/run/openapi.json")
+def openapi_spec(request: Request):
+    base_url = str(request.base_url).rstrip("/")
+    return {
+        "openapi": "3.0.1",
+        "info": {
+            "title": "Map Agent",
+            "description": "Generate interactive maps from Feishu Bitable data. Provide an app_token and table_id to create a map with geocoded locations.",
+            "version": "1.0.0",
+        },
+        "servers": [{"url": base_url}],
+        "paths": {
+            "/agent/run": {
+                "post": {
+                    "operationId": "generate_map",
+                    "summary": "Generate an interactive map from a Feishu Bitable",
+                    "description": "Reads location data from the specified Feishu Bitable table, geocodes addresses via AMap, and renders an interactive HTML map.",
+                    "security": [{"ApiKeyAuth": []}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["app_token", "table_id"],
+                                    "properties": {
+                                        "app_token": {
+                                            "type": "string",
+                                            "description": "The Feishu Bitable app token (found in the Bitable URL)",
+                                        },
+                                        "table_id": {
+                                            "type": "string",
+                                            "description": "The Feishu Bitable table ID (found in the Bitable URL)",
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Map generated successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "task_id": {"type": "string"},
+                                            "success_count": {"type": "integer"},
+                                            "url": {"type": "string", "description": "URL to the generated map HTML"},
+                                            "logs": {"type": "array", "items": {"type": "string"}},
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                    },
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "ApiKeyAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "Bearer token authentication. Set via API_KEY in .env",
+                }
+            }
+        },
+    }

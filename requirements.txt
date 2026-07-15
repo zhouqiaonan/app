@@ -1,6 +1,7 @@
 fastapi
-uvicorn
+langgraph
+lark-oapi
 pydantic
 pydantic-settings
-langgraph
 requests
+uvicorn
