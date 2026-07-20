@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.config import get_settings
+from config import get_settings
 
 security = HTTPBearer(auto_error=False)
 

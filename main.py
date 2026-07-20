@@ -1,15 +1,23 @@
+import logging
 from pathlib import Path
+
+# Configure logging so INFO and above messages from our app are visible
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .agent import run_map_agent
-from .agent_llm import run_chat_agent
-from .config import get_settings
-from .services.auth import verify_api_key
-from .tools.feishu_tool import FeishuClient
+from agent import run_map_agent
+from agent_llm import run_chat_agent
+from config import get_settings
+from services.auth import verify_api_key
+from tools.feishu_tool import FeishuClient
 
 settings = get_settings()
 app = FastAPI(title="Feishu Map Agent", version="0.1.0")

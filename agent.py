@@ -5,11 +5,11 @@ from uuid import uuid4
 
 from langgraph.graph import END, StateGraph
 
-from app.config import get_settings
-from app.tools.amap_tool import AMapClient
-from app.tools.distance_tool import calculate_distance_matrix
-from app.tools.feishu_tool import FeishuClient
-from app.tools.map_render_tool import generate_map_html, write_map_html
+from config import get_settings
+from tools.amap_tool import AMapClient
+from tools.distance_tool import calculate_distance_matrix
+from tools.feishu_tool import FeishuClient
+from tools.map_render_tool import generate_map_html, write_map_html
 
 
 ReadTable = Callable[[str, str], list[dict[str, Any]]]

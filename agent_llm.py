@@ -13,8 +13,8 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from app.config import get_settings
-from app.tools.llm_tools import (
+from config import get_settings
+from tools.llm_tools import (
     calculate_distances,
     geocode_addresses_async,
     list_feishu_tables,
@@ -81,9 +81,9 @@ def get_agent():
         raise ValueError("未配置 DEEPSEEK_API_KEY")
 
     llm = ChatOpenAI(
-        model="deepseek-chat",
+        model="deepseek-v4-pro",
         api_key=settings.deepseek_api_key,
-        base_url="https://api.deepseek.com/v1",
+        base_url="https://llm.meiying.homes/v1",
         temperature=0.1,
     )
 

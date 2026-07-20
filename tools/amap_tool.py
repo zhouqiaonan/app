@@ -28,7 +28,7 @@ class AMapClient:
     async def async_geocode_addresses(
         self,
         locations: list[dict[str, Any]],
-        max_concurrency: int = 10,
+        max_concurrency: int = 2,
     ) -> list[dict[str, Any]]:
         semaphore = asyncio.Semaphore(max_concurrency)
 
@@ -51,6 +51,7 @@ class AMapClient:
             ) as response:
                 response.raise_for_status()
                 payload = await response.json()
+                await asyncio.sleep(0.3)  # Rate limit: ~5 QPS per concurrent worker
                 return self._parse_geocode_response(location, payload)
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             return {

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工厂/门店分布地图</title>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b8188cc629524337f4c686c90e8aa4a"></script>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }
+    .header { height: 56px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; }
+    .header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+    .badge { font-size: 13px; color: #4b5563; background: #f3f4f6; border-radius: 999px; padding: 5px 10px; }
+    #map { width: 100%; height: calc(58vh - 56px); min-height: 360px; }
+    .table-wrap { height: 42vh; min-height: 260px; overflow: auto; padding: 16px 20px; background: #f9fafb; border-top: 1px solid #e5e7eb; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    table { border-collapse: collapse; width: 100%; background: white; font-size: 13px; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: center; white-space: nowrap; }
+    th { background: #1d4ed8; color: white; font-weight: 650; }
+    td:first-child { background: #f3f4f6; font-weight: 650; }
+    .near { color: #047857; }
+    .mid { color: #b45309; }
+    .far { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>工厂/门店分布地图</h1>
+    <span class="badge">共 14 个地点</span>
+  </header>
+  <main>
+    <div id="map"></div>
+    <section class="table-wrap">
+      <h2>距离矩阵</h2>
+      <div id="distance-table"></div>
+    </section>
+  </main>
+  <script>
+    const locationsData = [{"name": "浩博", "address": "新厂：浙江省湖州市安吉县北山工业区", "lng": 119.785786, "lat": 30.744878, "distances": {"浩博": 0, "维兹": 72840, "浙佳": 248296, "东大海绵": 251002, "洽丰": 151748, "韩电集团": 171985, "德姆勒": 210244, "云紫星": 721155, "宇博": 533318, "佳誉铂": 108314, "复海": 390683, "黑森林": 146531, "国森/大森木业": 685324, "鑫迈众": 1270653}}, {"name": "维兹", "address": "浙江省嘉兴市桐乡市凤鸣街道高新西四路", "lng": 120.531624, "lat": 30.612038, "distances": {"浩博": 72840, "维兹": 0, "浙佳": 200874, "东大海绵": 279233, "洽丰": 87160, "韩电集团": 101292, "德姆勒": 272300, "云紫星": 733746, "宇博": 525259, "佳誉铂": 125588, "复海": 406152, "黑森林": 146745, "国森/大森木业": 711695, "鑫迈众": 1305532}}, {"name": "浙佳", "address": "浙江省台州市临海市东塍镇上街村前洋东路", "lng": 121.279442, "lat": 28.926169, "distances": {"浩博": 248296, "维兹": 200874, "浙佳": 0, "东大海绵": 259650, "洽丰": 122435, "韩电集团": 137143, "德姆勒": 457871, "云紫星": 611122, "宇博": 367146, "佳誉铂": 326393, "复海": 601921, "黑森林": 343163, "国森/大森木业": 910566, "鑫迈众": 1506146}}, {"name": "东大海绵", "address": "浙江省衢州市江山市虎山街道网营物联", "lng": 118.623892, "lat": 28.725518, "distances": {"浩博": 251002, "维兹": 279233, "浙佳": 259650, "东大海绵": 0, "洽丰": 281854, "韩电集团": 315642, "德姆勒": 381051, "云紫星": 474067, "宇博": 325441, "佳誉铂": 357990, "复海": 630019, "黑森林": 397516, "国森/大森木业": 904790, "鑫迈众": 1465359}}, {"name": "洽丰", "address": "浙江省宁波市余姚市兰江街道肖东工业园区谭家岭西路", "lng": 121.125463, "lat": 30.019059, "distances": {"浩博": 151748, "维兹": 87160, "浙佳": 122435, "东大海绵": 281854, "洽丰": 0, "韩电集团": 33872, "德姆勒": 358492, "云紫星": 702280, "宇博": 474544, "佳誉铂": 208910, "复海": 479744, "黑森林": 221796, "国森/大森木业": 789114, "鑫迈众": 1386242}}, {"name": "韩电集团", "address": "慈溪观海卫镇工业园东区", "lng": 121.442583, "lat": 30.151332, "distances": {"浩博": 171985, "维兹": 101292, "浙佳": 137143, "东大海绵": 315642, "洽丰": 33872, "韩电集团": 0, "德姆勒": 372674, "云紫星": 730988, "宇博": 498549, "佳誉铂": 212665, "复海": 472331, "黑森林": 218854, "国森/大森木业": 783362, "鑫迈众": 1382740}}, {"name": "德姆勒", "address": "安徽省滁州市全椒县十字镇十谭工业园", "lng": 118.290262, "lat": 32.140305, "distances": {"浩博": 210244, "维兹": 272300, "浙佳": 457871, "东大海绵": 381051, "洽丰": 358492, "韩电集团": 372674, "德姆勒": 0, "云紫星": 844142, "宇博": 701255, "佳誉铂": 178614, "复海": 289240, "黑森林": 205822, "国森/大森木业": 527403, "鑫迈众": 1086241}}, {"name": "云紫星", "address": "福建省漳州市南靖县靖城镇科技路", "lng": 117.510892, "lat": 24.57971, "distances": {"浩博": 721155, "维兹": 733746, "浙佳": 611122, "东大海绵": 474067, "洽丰": 702280, "韩电集团": 730988, "德姆勒": 844142, "云紫星": 0, "宇博": 265109, "佳誉铂": 829377, "复海": 1104029, "黑森林": 866754, "国森/大森木业": 1371544, "鑫迈众": 1909431}}, {"name": "宇博", "address": "福建省福州市长乐区湖南镇鹏程路18号金山空港工业集中区", "lng": 119.668632, "lat": 25.949743, "distances": {"浩博": 533318, "维兹": 525259, "浙佳": 367146, "东大海绵": 325441, "洽丰": 474544, "韩电集团": 498549, "德姆勒": 701255, "云紫星": 265109, "宇博": 0, "佳誉铂": 638617, "复海": 923658, "黑森林": 669442, "国森/大森木业": 1215582, "鑫迈众": 1787492}}, {"name": "佳誉铂", "address": "江苏省常州市武进区横林镇横洛东路", "lng": 120.103335, "lat": 31.680343, "distances": {"浩博": 108314, "维兹": 125588, "浙佳": 326393, "东大海绵": 357990, "洽丰": 208910, "韩电集团": 212665, "德姆勒": 178614, "云紫星": 829377, "宇博": 638617, "佳誉铂": 0, "复海": 285460, "黑森林": 43666, "国森/大森木业": 587160, "鑫迈众": 1179955}}, {"name": "复海", "address": "江苏省盐城市滨海县蔡桥镇科技产业园创新大道", "lng": 120.112958, "lat": 34.247533, "distances": {"浩博": 390683, "维兹": 406152, "浙佳": 601921, "东大海绵": 630019, "洽丰": 479744, "韩电集团": 472331, "德姆勒": 289240, "云紫星": 1104029, "宇博": 923658, "佳誉铂": 285460, "复海": 0, "黑森林": 259679, "国森/大森木业": 311816, "鑫迈众": 913569}}, {"name": "黑森林", "address": "江苏省张家港市金港镇晨丰公路", "lng": 120.459712, "lat": 31.930316, "distances": {"浩博": 146531, "维兹": 146745, "浙佳": 343163, "东大海绵": 397516, "洽丰": 221796, "韩电集团": 218854, "德姆勒": 205822, "云紫星": 866754, "宇博": 669442, "佳誉铂": 43666, "复海": 259679, "黑森林": 0, "国森/大森木业": 567442, "鑫迈众": 1164747}}, {"name": "国森/大森木业", "address": "山东省潍坊市寿光市洛城街道洛兴街与永宁路交叉口路北东侧350米", "lng": 118.860197, "lat": 36.860074, "distances": {"浩博": 685324, "维兹": 711695, "浙佳": 910566, "东大海绵": 904790, "洽丰": 789114, "韩电集团": 783362, "德姆勒": 527403, "云紫星": 1371544, "宇博": 1215582, "佳誉铂": 587160, "复海": 311816, "黑森林": 567442, "国森/大森木业": 0, "鑫迈众": 602365}}, {"name": "鑫迈众", "address": "河北省任丘市经济开发区北区林兴路北侧京南创新产业园", "lng": 115.672293, "lat": 41.683652, "distances": {"浩博": 1270653, "维兹": 1305532, "浙佳": 1506146, "东大海绵": 1465359, "洽丰": 1386242, "韩电集团": 1382740, "德姆勒": 1086241, "云紫星": 1909431, "宇博": 1787492, "佳誉铂": 1179955, "复海": 913569, "黑森林": 1164747, "国森/大森木业": 602365, "鑫迈众": 0}}];
+
+    function formatDistance(meters) {
+      if (meters === 0) return "-";
+      return meters >= 1000 ? (meters / 1000).toFixed(1) + "km" : Math.round(meters) + "m";
+    }
+
+    function distanceClass(meters) {
+      if (meters > 0 && meters < 5000) return "near";
+      if (meters >= 5000 && meters < 20000) return "mid";
+      if (meters >= 20000) return "far";
+      return "";
+    }
+
+    function renderTable() {
+      const names = locationsData.map((item) => item.name);
+      let markup = "<table><thead><tr><th>地点</th>";
+      names.forEach((name) => markup += `<th>${name}</th>`);
+      markup += "</tr></thead><tbody>";
+      locationsData.forEach((row) => {
+        markup += `<tr><td>${row.name}</td>`;
+        locationsData.forEach((col) => {
+          const distance = row.distances[col.name] || 0;
+          markup += `<td class="${distanceClass(distance)}">${formatDistance(distance)}</td>`;
+        });
+        markup += "</tr>";
+      });
+      markup += "</tbody></table>";
+      document.getElementById("distance-table").innerHTML = markup;
+    }
+
+    const initialCenter = locationsData.length ? [locationsData[0].lng, locationsData[0].lat] : [116.397, 39.908];
+    const map = new AMap.Map("map", { zoom: 11, center: initialCenter });
+    const markers = [];
+    locationsData.forEach((item) => {
+      const marker = new AMap.Marker({
+        position: [item.lng, item.lat],
+        title: item.name,
+        label: {
+          content: `<div style="background:#fff;padding:3px 8px;border:1px solid #1d4ed8;border-radius:4px;font-size:12px;font-weight:700;">${item.name}</div>`,
+          direction: "top"
+        }
+      });
+      markers.push(marker);
+      map.add(marker);
+    });
+    if (markers.length) map.setFitView(markers);
+    renderTable();
+  </script>
+</body>
+</html>

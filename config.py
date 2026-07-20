@@ -1,5 +1,7 @@
 import json
+import logging
 import warnings
+from pathlib import Path
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,7 +20,7 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     feishu_app_tokens: str = ""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=str(Path(__file__).parent / ".env"), env_file_encoding="utf-8")
 
     def get_app_tokens(self) -> list[dict]:
         """Parse feishu_app_tokens JSON string into a list of dicts.
@@ -26,16 +28,20 @@ class Settings(BaseSettings):
         Expected format: [{"app_token": "bascnxxx", "name": "深圳门店"}, ...]
         Returns empty list if feishu_app_tokens is empty or invalid JSON.
         """
+        logger = logging.getLogger(__name__)
         if not self.feishu_app_tokens:
+            logger.warning("FEISHU_APP_TOKENS is empty")
             return []
+        logger.info("FEISHU_APP_TOKENS raw: %s", self.feishu_app_tokens)
         try:
             tokens = json.loads(self.feishu_app_tokens)
             if isinstance(tokens, list):
+                logger.info("Parsed %d app token(s)", len(tokens))
                 return tokens
-            warnings.warn("feishu_app_tokens is not a JSON array, ignoring.")
+            logger.warning("feishu_app_tokens is not a JSON array, type=%s", type(tokens))
             return []
-        except json.JSONDecodeError:
-            warnings.warn("feishu_app_tokens is not valid JSON, ignoring.")
+        except json.JSONDecodeError as e:
+            logger.warning("feishu_app_tokens JSON parse failed: %s", e)
             return []
 
 

@@ -7,11 +7,11 @@ from uuid import uuid4
 
 from langchain_core.tools import tool
 
-from app.config import get_settings
-from app.tools.amap_tool import AMapClient
-from app.tools.distance_tool import calculate_distance_matrix
-from app.tools.feishu_tool import FeishuClient
-from app.tools.map_render_tool import generate_map_html, write_map_html
+from config import get_settings
+from tools.amap_tool import AMapClient
+from tools.distance_tool import calculate_distance_matrix
+from tools.feishu_tool import FeishuClient
+from tools.map_render_tool import generate_map_html, write_map_html
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ def list_feishu_tables() -> list[dict]:
     settings = get_settings()
     app_tokens = settings.get_app_tokens()
     results: list[dict] = []
+
+    logger.info("list_feishu_tables: found %d app tokens to query", len(app_tokens))
 
     for app_info in app_tokens:
         app_token = app_info.get("app_token", "")
@@ -45,9 +47,10 @@ def list_feishu_tables() -> list[dict]:
                     }
                 )
         except Exception as e:
-            logger.warning("获取应用 %s (token=%s) 的表格列表失败: %s", app_name, app_token, e)
+            logger.warning("获取应用 %s (token=%s) 的表格列表失败: %s", app_name, app_token, e, exc_info=True)
             continue
 
+    logger.info("list_feishu_tables: returning %d tables total", len(results))
     return results
 
 

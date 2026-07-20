@@ -16,16 +16,17 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: 
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
   <script src="https://webapi.amap.com/maps?v=2.0&key={safe_key}"></script>
-  <style>
-    body {{ margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }}
-    .header {{ height: 56px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; }}
-    .header h1 {{ margin: 0; font-size: 18px; font-weight: 700; }}
-    .badge {{ font-size: 13px; color: #4b5563; background: #f3f4f6; border-radius: 999px; padding: 5px 10px; }}
-    #map {{ width: 100%; height: calc(58vh - 56px); min-height: 360px; }}
-    .table-wrap {{ height: 42vh; min-height: 260px; overflow: auto; padding: 16px 20px; background: #f9fafb; border-top: 1px solid #e5e7eb; }}
-    h2 {{ margin: 0 0 12px; font-size: 16px; }}
+   <style>
+    body {{ margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }}
+    .header {{ height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }}
+    .header h1 {{ margin: 0; font-size: 16px; font-weight: 700; }}
+    .badge {{ font-size: 12px; color: #4b5563; background: #f3f4f6; border-radius: 999px; padding: 4px 10px; }}
+    main {{ flex: 1; display: flex; flex-direction: column; overflow: hidden; }}
+    #map {{ width: 100%; flex: 1; min-height: 300px; }}
+    .table-wrap {{ max-height: 35vh; overflow: auto; padding: 12px 16px; background: #f9fafb; border-top: 1px solid #e5e7eb; flex-shrink: 0; }}
+    h2 {{ margin: 0 0 8px; font-size: 14px; }}
     table {{ border-collapse: collapse; width: 100%; background: white; font-size: 13px; }}
-    th, td {{ border: 1px solid #e5e7eb; padding: 8px 10px; text-align: center; white-space: nowrap; }}
+    th, td {{ border: 1px solid #e5e7eb; padding: 6px 8px; text-align: center; white-space: nowrap; }}
     th {{ background: #1d4ed8; color: white; font-weight: 650; }}
     td:first-child {{ background: #f3f4f6; font-weight: 650; }}
     .near {{ color: #047857; }}
