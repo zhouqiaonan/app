@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 
-def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str) -> str:
+def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: str = "地址标注地图") -> str:
     data_json = json.dumps(locations, ensure_ascii=False)
     safe_key = html.escape(amap_js_key, quote=True)
     count = len(locations)
@@ -14,7 +14,7 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>地址标注地图</title>
+  <title>{html.escape(title)}</title>
   <script src="https://webapi.amap.com/maps?v=2.0&key={safe_key}"></script>
   <style>
     body {{ margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }}
@@ -35,7 +35,7 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str) -> str:
 </head>
 <body>
   <header class="header">
-    <h1>地址标注地图</h1>
+    <h1>{html.escape(title)}</h1>
     <span class="badge">共 {count} 个地点</span>
   </header>
   <main>

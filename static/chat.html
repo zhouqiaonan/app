@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飞书地图助手 — 调试聊天</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #1d4ed8;
+    --blue-light: #dbeafe;
+    --gray: #6b7280;
+    --gray-light: #f3f4f6;
+    --gray-dark: #374151;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --radius: 16px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f9fafb;
+    color: #111827;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .status-dot.ok { background: #22c55e; }
+  .status-dot.warn { background: #f59e0b; }
+  .status-dot.error { background: #dc2626; }
+  .status-text {
+    font-size: 13px;
+    color: var(--gray);
+  }
+  .api-key-input {
+    font-size: 13px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius-sm);
+    width: 200px;
+    outline: none;
+    font-family: monospace;
+  }
+  .api-key-input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+
+  /* Warning banner */
+  .warning-banner {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 10px 16px;
+    font-size: 14px;
+    text-align: center;
+    display: none;
+    flex-shrink: 0;
+    border-bottom: 1px solid #fde68a;
+  }
+  .warning-banner.show { display: block; }
+
+  /* Chat area */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+
+  /* Messages */
+  .message {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    line-height: 1.6;
+    font-size: 15px;
+    word-wrap: break-word;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .message.user {
+    align-self: flex-end;
+    background: var(--blue);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .message.bot {
+    align-self: flex-start;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    color: var(--gray-dark);
+    border-bottom-left-radius: 4px;
+  }
+  .message.error {
+    align-self: center;
+    background: var(--red-light);
+    color: var(--red);
+    border: 1px solid #fecaca;
+    font-size: 14px;
+  }
+  .message.loading {
+    align-self: flex-start;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    color: var(--gray);
+    border-bottom-left-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Loading dots */
+  .dots { display: inline-flex; gap: 4px; }
+  .dots span {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+    animation: bounce 1.4s infinite ease-in-out both;
+  }
+  .dots span:nth-child(1) { animation-delay: -0.32s; }
+  .dots span:nth-child(2) { animation-delay: -0.16s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+  }
+
+  /* Markdown inside bot messages */
+  .message.bot h1, .message.bot h2, .message.bot h3 { margin: 8px 0 4px; font-size: 1.1em; }
+  .message.bot p { margin: 4px 0; }
+  .message.bot ul, .message.bot ol { padding-left: 20px; margin: 4px 0; }
+  .message.bot li { margin: 2px 0; }
+  .message.bot code {
+    background: var(--gray-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .message.bot pre {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    margin: 8px 0;
+  }
+  .message.bot pre code { background: none; padding: 0; color: inherit; }
+  .message.bot a { color: var(--blue); }
+  .message.bot blockquote {
+    border-left: 3px solid var(--blue);
+    padding-left: 12px;
+    margin: 8px 0;
+    color: var(--gray);
+  }
+  .message.bot strong { font-weight: 600; }
+  .message.bot em { font-style: italic; }
+
+  /* Map link button */
+  .map-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    font-size: 14px;
+    margin: 4px 0;
+    transition: background 0.2s;
+  }
+  .map-link-btn:hover { background: #d1fae5; }
+
+  /* Input area */
+  .input-area {
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  .input-area textarea {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 44px;
+    max-height: 120px;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+  .input-area textarea:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(29,78,216,0.15);
+  }
+  .send-btn {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+  .send-btn:hover { background: #1e40af; }
+  .send-btn:disabled {
+    background: #93c5fd;
+    cursor: not-allowed;
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .message { max-width: 92%; }
+    .header { padding: 10px 12px; }
+    .header-title { font-size: 16px; }
+    .api-key-input { width: 140px; font-size: 12px; }
+    .input-area { padding: 10px 12px; }
+    .send-btn { padding: 10px 16px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">🗺️ 飞书地图助手</div>
+  <div class="header-right">
+    <span class="status-dot warn" id="status-dot"></span>
+    <span class="status-text" id="status-text">等待 API Key</span>
+    <input
+      class="api-key-input"
+      type="password"
+      id="api-key-input"
+      placeholder="粘贴 Bearer Token…"
+      autocomplete="off"
+    >
+  </div>
+</div>
+
+<div class="warning-banner" id="warning-banner">
+  ⚠️ 未配置 API Key，请粘贴 Bearer Token 后重试
+</div>
+
+<div class="chat-area" id="chat-area">
+  <!-- Welcome message will be inserted by JS -->
+</div>
+
+<div class="input-area">
+  <textarea
+    id="user-input"
+    placeholder="描述你的需求，例如「帮我生成深圳门店的地图」…"
+    rows="1"
+  ></textarea>
+  <button class="send-btn" id="send-btn" disabled>发送</button>
+</div>
+
+<script>
+(function() {
+  const chatArea = document.getElementById('chat-area');
+  const userInput = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const warningBanner = document.getElementById('warning-banner');
+  const CHAT_URL = '/agent/chat';
+
+  let isWaiting = false;
+
+  // --- Helpers ---
+
+  function getApiKey() {
+    const raw = (apiKeyInput.value || '').trim();
+    if (!raw) return null;
+    return raw.startsWith('Bearer ') ? raw : 'Bearer ' + raw;
+  }
+
+  function updateApiKeyStatus() {
+    const key = apiKeyInput.value.trim();
+    if (key) {
+      statusDot.className = 'status-dot ok';
+      statusText.textContent = 'API Key 已设置';
+      warningBanner.classList.remove('show');
+      sendBtn.disabled = false;
+    } else {
+      statusDot.className = 'status-dot warn';
+      statusText.textContent = '等待 API Key';
+      sendBtn.disabled = true;
+    }
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      chatArea.scrollTop = chatArea.scrollHeight;
+    });
+  }
+
+  function createMessageEl(role) {
+    const el = document.createElement('div');
+    el.className = 'message ' + role;
+    return el;
+  }
+
+  function addUserMessage(text) {
+    const el = createMessageEl('user');
+    el.textContent = text;
+    chatArea.appendChild(el);
+    scrollToBottom();
+  }
+
+  function addBotMessage(html) {
+    const el = createMessageEl('bot');
+    el.innerHTML = processBotContent(html);
+    chatArea.appendChild(el);
+    scrollToBottom();
+  }
+
+  function addErrorMessage(text) {
+    const el = createMessageEl('error');
+    el.textContent = '❌ ' + text;
+    chatArea.appendChild(el);
+    scrollToBottom();
+  }
+
+  function processBotContent(rawHtml) {
+    // Replace bare URLs of the form /maps/... with a styled link button
+    // Also handle full URLs pointing to map files
+    return rawHtml.replace(
+      /(https?:\/\/[^\s<>"]+?(?:\.html|\.htm)(?:\?[^\s<>"]*)?)|(\/maps\/[^\s<>"]+?(?:\.html|\.htm)(?:\?[^\s<>"]*)?)/gi,
+      function(match, fullUrl, relativeUrl) {
+        const url = fullUrl || relativeUrl;
+        // Only style as map link if it looks like a map URL
+        if (/\/maps\//.test(url) || /\.html/.test(url)) {
+          return '<a class="map-link-btn" href="' + url + '" target="_blank" rel="noopener">🔗 查看地图</a>';
+        }
+        return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+      }
+    );
+  }
+
+  function showLoading() {
+    const el = document.createElement('div');
+    el.className = 'message loading';
+    el.id = 'loading-msg';
+    el.innerHTML = '思考中 <span class="dots"><span></span><span></span><span></span></span>';
+    chatArea.appendChild(el);
+    scrollToBottom();
+    isWaiting = true;
+    sendBtn.disabled = true;
+  }
+
+  function hideLoading() {
+    const el = document.getElementById('loading-msg');
+    if (el) el.remove();
+    isWaiting = false;
+    updateApiKeyStatus();
+  }
+
+  function showWelcome() {
+    const el = createMessageEl('bot');
+    el.innerHTML = processBotContent(
+      '<p>你好！我是飞书地图助手，可以帮你生成地址分布地图。请描述你的需求，例如「帮我生成深圳门店的地图」。</p>'
+    );
+    chatArea.appendChild(el);
+  }
+
+  // --- API call ---
+
+  async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text || isWaiting) return;
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      warningBanner.classList.add('show');
+      addErrorMessage('请先设置 API Key（Bearer Token）');
+      return;
+    }
+
+    addUserMessage(text);
+    userInput.value = '';
+    userInput.style.height = 'auto';
+    showLoading();
+
+    try {
+      const res = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({ query: text }),
+      });
+
+      hideLoading();
+
+      if (!res.ok) {
+        let errText = '';
+        try {
+          const errData = await res.json();
+          errText = errData.detail || JSON.stringify(errData);
+        } catch {
+          errText = res.statusText || 'HTTP ' + res.status;
+        }
+
+        // Detect DEEPSEEK_API_KEY or config issues
+        if (errText.includes('DEEPSEEK_API_KEY') || errText.includes('未配置')) {
+          warningBanner.classList.add('show');
+          statusDot.className = 'status-dot error';
+          statusText.textContent = 'DEEPSEEK_API_KEY 未配置';
+        }
+
+        addErrorMessage(errText);
+        return;
+      }
+
+      const data = await res.json();
+
+      // Expecting { reply: "..." } from run_chat_agent
+      const reply = data.reply || data.response || data.message || JSON.stringify(data);
+      addBotMessage(reply);
+
+    } catch (err) {
+      hideLoading();
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        addErrorMessage('网络错误，请检查服务是否可用');
+      } else {
+        addErrorMessage(err.message || '未知错误');
+      }
+    }
+  }
+
+  // --- Event listeners ---
+
+  apiKeyInput.addEventListener('input', updateApiKeyStatus);
+
+  sendBtn.addEventListener('click', sendMessage);
+
+  userInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+    // Shift+Enter inserts newline (default behavior, no action needed)
+  });
+
+  // Auto-resize textarea
+  userInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  // --- Init ---
+  showWelcome();
+  updateApiKeyStatus();
+})();
+</script>
+</body>
+</html>

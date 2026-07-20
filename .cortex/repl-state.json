@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "planFilename": "2026-07-20-feature-llm-agent-deepseek-react-agent.md",
+  "startedAt": "2026-07-20T04:08:24.974Z",
+  "buildCommand": "python -c \"from app.main import app; from app.agent_llm import run_chat_agent; print('All imports OK')\"",
+  "testCommand": "curl -s http://localhost:8000/health || echo \"Server not running — skip integration test\"",
+  "lintCommand": null,
+  "maxRetries": 3,
+  "currentTaskIndex": -1,
+  "tasks": [
+    {
+      "index": 0,
+      "description": "配置层升级 — config.py 新增 deepseek_api_key 和 feishu_app_tokens 配置项",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:09:21.396Z",
+          "result": "pass",
+          "detail": "config.py updated: added deepseek_api_key, feishu_app_tokens fields + get_app_tokens() helper. Build fails only on missing agent_llm (Task 5). Config changes imported and parsed correctly."
+        }
+      ],
+      "startedAt": "2026-07-20T04:08:27.254Z",
+      "completedAt": "2026-07-20T04:09:21.396Z"
+    },
+    {
+      "index": 1,
+      "description": "飞书工具增强 — FeishuClient 新增 list_tables 方法",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:10:16.637Z",
+          "result": "pass",
+          "detail": "FeishuClient.list_tables() added — GET /bitable/v1/apps/{app_token}/tables with pagination, auth, error handling. Import verified. Build fails only on missing agent_llm (Task 5)."
+        }
+      ],
+      "startedAt": "2026-07-20T04:09:21.396Z",
+      "completedAt": "2026-07-20T04:10:16.637Z"
+    },
+    {
+      "index": 2,
+      "description": "高德工具异步化 — AMapClient 新增异步并发地理编码方法",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 1,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:11:13.043Z",
+          "result": "fail",
+          "detail": "_geocode_one_async creates its own ClientSession per address instead of reusing the shared session from async_geocode_addresses. The outer session is created but unused — needs to be passed into the inner async method."
+        },
+        {
+          "at": "2026-07-20T04:12:31.271Z",
+          "result": "pass",
+          "detail": "Fixed session reuse: shared ClientSession passed from async_geocode_addresses into _geocode_one_async. Sync method unchanged. Async imports verified. aiohttp installed for verification."
+        }
+      ],
+      "startedAt": "2026-07-20T04:10:16.637Z",
+      "completedAt": "2026-07-20T04:12:31.271Z"
+    },
+    {
+      "index": 3,
+      "description": "LangChain 工具包装 — 新建 tools/llm_tools.py，将5个工具包装为 LangChain @tool",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:14:21.670Z",
+          "result": "pass",
+          "detail": "Created tools/llm_tools.py with 5 LangChain @tool functions: list_feishu_tables, read_feishu_records, geocode_addresses_async, calculate_distances, render_map. All import correctly as StructuredTool. Chinese docstrings, error handling, per-app isolation."
+        }
+      ],
+      "startedAt": "2026-07-20T04:12:31.271Z",
+      "completedAt": "2026-07-20T04:14:21.670Z"
+    },
+    {
+      "index": 4,
+      "description": "ReAct Agent 实现 — 新建 agent_llm.py，使用 langgraph.prebuilt.create_react_agent",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:16:23.744Z",
+          "result": "pass",
+          "detail": "Created agent_llm.py with ReAct Agent using create_react_agent. Full build passes (all imports OK). Error handling verified: missing API key returns graceful Chinese error. Lazy singleton pattern, Chinese system prompt, structured response."
+        }
+      ],
+      "startedAt": "2026-07-20T04:14:21.670Z",
+      "completedAt": "2026-07-20T04:16:23.744Z"
+    },
+    {
+      "index": 5,
+      "description": "Chat API 端点 — main.py 新增 POST /agent/chat 端点",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:17:16.012Z",
+          "result": "pass",
+          "detail": "Added POST /agent/chat endpoint with ChatRequest model, auth via verify_api_key, delegates to run_chat_agent. Existing endpoints untouched. Full build passes."
+        }
+      ],
+      "startedAt": "2026-07-20T04:16:23.744Z",
+      "completedAt": "2026-07-20T04:17:16.012Z"
+    },
+    {
+      "index": 6,
+      "description": "聊天调试 UI — 新建 static/chat.html，新增 GET /chat 路由",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:19:12.979Z",
+          "result": "pass",
+          "detail": "Created static/chat.html (509 lines, 13KB) — vanilla JS chat UI with Markdown, map links, Bearer token input, Enter-to-send, responsive. Added GET /chat route. Full build passes, TestClient verifies 200 HTML response."
+        }
+      ],
+      "startedAt": "2026-07-20T04:17:16.012Z",
+      "completedAt": "2026-07-20T04:19:12.979Z"
+    },
+    {
+      "index": 7,
+      "description": "依赖更新 — requirements.txt 新增 langchain-openai, aiohttp",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:19:38.446Z",
+          "result": "pass",
+          "detail": "Updated requirements.txt: added aiohttp + langchain-openai, removed python-dotenv (unused). Alphabetically sorted, no version pins. All 9 packages install cleanly. Full build passes."
+        }
+      ],
+      "startedAt": "2026-07-20T04:19:12.979Z",
+      "completedAt": "2026-07-20T04:19:38.446Z"
+    },
+    {
+      "index": 8,
+      "description": "代码清理 — 删除 main_test.py，移除不再需要的依赖",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:19:55.975Z",
+          "result": "pass",
+          "detail": "Deleted main_test.py (legacy WebSocket echo bot). No code references to it. Services directory clean (only auth.py). Full build passes."
+        }
+      ],
+      "startedAt": "2026-07-20T04:19:38.446Z",
+      "completedAt": "2026-07-20T04:19:55.975Z"
+    },
+    {
+      "index": 9,
+      "description": "构建验证 — 确保所有模块可导入，health/chat 端点正常",
+      "acceptanceCriteria": [],
+      "status": "passed",
+      "retries": 0,
+      "iterations": [
+        {
+          "at": "2026-07-20T04:20:24.388Z",
+          "result": "pass",
+          "detail": "All 12 modules import successfully. All endpoints verified: /health 200, /chat 200 HTML, /agent/chat 200 (graceful error), /agent/run/openapi.json 200. Full build passes. Project ready."
+        }
+      ],
+      "startedAt": "2026-07-20T04:19:55.975Z",
+      "completedAt": "2026-07-20T04:20:24.388Z"
+    }
+  ],
+  "completedAt": "2026-07-20T04:20:24.388Z"
+}

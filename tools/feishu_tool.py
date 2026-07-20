@@ -53,6 +53,38 @@ class FeishuClient:
 
         return [_record_to_location(item) for item in items]
 
+    def list_tables(self, app_token: str) -> list[dict[str, Any]]:
+        token = self.tenant_access_token()
+        items: list[dict[str, Any]] = []
+        page_token = ""
+
+        while True:
+            params: dict[str, Any] = {"page_size": 500}
+            if page_token:
+                params["page_token"] = page_token
+
+            response = requests.get(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                params=params,
+                timeout=15,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("code", 0) != 0:
+                raise RuntimeError(f"获取飞书多维表格列表失败: {payload.get('msg', payload)}")
+
+            data = payload.get("data", {})
+            items.extend(data.get("items", []))
+            if not data.get("has_more"):
+                break
+            page_token = data.get("page_token", "")
+
+        return items
+
 
 def _record_to_location(record: dict[str, Any]) -> dict[str, str]:
     fields = record.get("fields", {})

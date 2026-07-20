@@ -1,14 +1,15 @@
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.agent import run_map_agent
-from app.config import get_settings
-from app.services.auth import verify_api_key
-from app.tools.feishu_tool import FeishuClient
+from .agent import run_map_agent
+from .agent_llm import run_chat_agent
+from .config import get_settings
+from .services.auth import verify_api_key
+from .tools.feishu_tool import FeishuClient
 
 settings = get_settings()
 app = FastAPI(title="Feishu Map Agent", version="0.1.0")
@@ -17,9 +18,20 @@ Path(settings.map_output_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/maps", StaticFiles(directory=settings.map_output_dir, html=True), name="maps")
 
 
+@app.get("/chat", response_class=HTMLResponse)
+def chat_page():
+    chat_html = Path(__file__).parent / "static" / "chat.html"
+    return chat_html.read_text(encoding="utf-8")
+
+
 class ManualRunRequest(BaseModel):
     app_token: str
     table_id: str
+
+
+class ChatRequest(BaseModel):
+    query: str = Field(..., max_length=4096, description="用户自然语言查询")
+    session_id: str | None = None
 
 
 @app.get("/health")
@@ -42,6 +54,15 @@ def manual_run(
         "url": f"{settings.public_base_url.rstrip('/')}/maps/{result.task_id}.html",
         "logs": result.logs,
     }
+
+
+@app.post("/agent/chat")
+def agent_chat(
+    request: ChatRequest,
+    _auth: None = Depends(verify_api_key),
+):
+    result = run_chat_agent(request.query, request.session_id)
+    return result
 
 
 @app.get("/agent/run/openapi.json")

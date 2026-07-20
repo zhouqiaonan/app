@@ -1,5 +1,6 @@
+aiohttp
 fastapi
-python-dotenv
+langchain-openai
 langgraph
 lark-oapi
 pydantic
