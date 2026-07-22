@@ -64,7 +64,8 @@ class FeishuClient:
         except Exception:
             name_field, addr_field = None, None
 
-        return [_record_to_location(item, name_field, addr_field) for item in items]
+        # TODO: 临时限制，后续移除
+        return [_record_to_location(item, name_field, addr_field) for item in items[:8]]
 
     def list_tables(self, app_token: str) -> list[dict[str, Any]]:
         token = self.tenant_access_token()

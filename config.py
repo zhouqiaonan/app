@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     feishu_encrypt_key: str = ""
     amap_web_key: str = ""
     amap_js_key: str = ""
+    db_path: str = "data/distances.db"
     public_base_url: str = "http://localhost:8000"
     map_output_dir: str = "static/maps"
     api_key: str = ""  # 默认空，未配置时不强制鉴权（兼容本地开发）

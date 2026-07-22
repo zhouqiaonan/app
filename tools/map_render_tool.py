@@ -32,6 +32,12 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: 
     .near {{ color: #047857; }}
     .mid {{ color: #b45309; }}
     .far {{ color: #b91c1c; }}
+    .highlight-row td {{ background: #dbeafe !important; }}
+    .highlight-row td:first-child {{ background: #93c5fd !important; font-weight: 700; }}
+    .iw-list {{ list-style: none; padding: 0; margin: 0; font-size: 13px; line-height: 1.8; }}
+    .iw-list li {{ padding: 1px 0; white-space: nowrap; }}
+    .iw-title {{ font-weight: 700; font-size: 14px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }}
+    .iw-more {{ color: #9ca3af; font-size: 12px; margin-top: 4px; }}
   </style>
 </head>
 <body>
@@ -49,6 +55,7 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: 
   <script>
     const locationsData = {data_json};
 
+    // ---- helpers ----
     function formatDistance(meters) {{
       if (meters === 0) return "-";
       return meters >= 1000 ? (meters / 1000).toFixed(1) + "km" : Math.round(meters) + "m";
@@ -61,13 +68,29 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: 
       return "";
     }}
 
+    function getDistColor(meters) {{
+      if (meters > 0 && meters < 5000) return "#047857";
+      if (meters >= 5000 && meters < 20000) return "#b45309";
+      if (meters >= 20000) return "#b91c1c";
+      return "#6b7280";
+    }}
+
+    function getLineWeight(meters) {{
+      return meters < 5000 ? 3 : (meters < 20000 ? 2 : 1.5);
+    }}
+
+    function findLocationByName(name) {{
+      return locationsData.find(item => item.name === name) || null;
+    }}
+
+    // ---- render table ----
     function renderTable() {{
       const names = locationsData.map((item) => item.name);
       let markup = "<table><thead><tr><th>地点</th>";
       names.forEach((name) => markup += `<th>${{name}}</th>`);
       markup += "</tr></thead><tbody>";
       locationsData.forEach((row) => {{
-        markup += `<tr><td>${{row.name}}</td>`;
+        markup += `<tr id="row-${{row.name.replace(/"/g,'&quot;')}}"><td>${{row.name}}</td>`;
         locationsData.forEach((col) => {{
           const distance = row.distances[col.name] || 0;
           markup += `<td class="${{distanceClass(distance)}}">${{formatDistance(distance)}}</td>`;
@@ -78,10 +101,109 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: 
       document.getElementById("distance-table").innerHTML = markup;
     }}
 
+    // ---- selection state ----
+    let activeOverlays = [];
+    let activeInfoWindow = null;
+    let selectedName = null;
+
+    function clearSelection() {{
+      activeOverlays.forEach(o => map.remove(o));
+      activeOverlays = [];
+      if (activeInfoWindow) {{
+        activeInfoWindow.close();
+        activeInfoWindow = null;
+      }}
+      if (selectedName) {{
+        const row = document.getElementById("row-" + selectedName.replace(/"/g, '&quot;'));
+        if (row) row.classList.remove("highlight-row");
+        selectedName = null;
+      }}
+    }}
+
+    // ---- build InfoWindow content ----
+    function buildInfoWindowContent(location, sortedDistances) {{
+      const top7 = sortedDistances.slice(0, 7);
+      const totalOthers = sortedDistances.length - 7;
+      let items = top7.map(([name, dist]) => {{
+        return `<li style="color:${{getDistColor(dist)}}">${{name}}&nbsp;&nbsp;${{formatDistance(dist)}}</li>`;
+      }}).join("");
+      if (totalOthers > 0) {{
+        items += `<li class="iw-more">...共 ${{sortedDistances.length}} 个其他地点</li>`;
+      }}
+      return `<div class="iw-title">${{location.name}}</div><ul class="iw-list">${{items}}</ul>`;
+    }}
+
+    // ---- draw polylines ----
+    function drawPolylines(origin, sortedDistances) {{
+      const top7 = sortedDistances.slice(0, 7);
+      top7.forEach(([targetName, dist]) => {{
+        const target = findLocationByName(targetName);
+        if (!target) return;
+        const color = getDistColor(dist);
+        const line = new AMap.Polyline({{
+          path: [[origin.lng, origin.lat], [target.lng, target.lat]],
+          strokeColor: color,
+          strokeWeight: getLineWeight(dist),
+          strokeOpacity: 0.7,
+          lineJoin: 'round',
+        }});
+        map.add(line);
+        activeOverlays.push(line);
+        const mid = [(origin.lng + target.lng) / 2, (origin.lat + target.lat) / 2];
+        const text = new AMap.Text({{
+          text: formatDistance(dist),
+          position: mid,
+          style: {{ color: color, fontSize: '11px', fontWeight: '600', background: 'rgba(255,255,255,0.85)', padding: '1px 4px', borderRadius: '3px' }}
+        }});
+        map.add(text);
+        activeOverlays.push(text);
+      }});
+    }}
+
+    // ---- highlight table row ----
+    function highlightTableRow(name) {{
+      const row = document.getElementById("row-" + name.replace(/"/g, '&quot;'));
+      if (row) {{
+        row.classList.add("highlight-row");
+        row.scrollIntoView({{ behavior: "smooth", block: "center" }});
+      }}
+    }}
+
+    // ---- marker click handler ----
+    function handleMarkerClick(location, index) {{
+      if (selectedName === location.name) {{
+        clearSelection();
+        return;
+      }}
+      clearSelection();
+      selectedName = location.name;
+
+      const distances = location.distances || {{}};
+      const sorted = Object.entries(distances)
+        .filter(([name]) => name !== location.name)
+        .sort((a, b) => a[1] - b[1]);
+
+      // 1. draw polylines (top 5)
+      drawPolylines(location, sorted);
+
+      // 2. show InfoWindow
+      const content = buildInfoWindowContent(location, sorted);
+      activeInfoWindow = new AMap.InfoWindow({{
+        content: content,
+        offset: new AMap.Pixel(0, -35),
+      }});
+      activeInfoWindow.open(map, [location.lng, location.lat]);
+
+      // 3. highlight table
+      highlightTableRow(location.name);
+    }}
+
+    // ---- init map ----
     const initialCenter = locationsData.length ? [locationsData[0].lng, locationsData[0].lat] : [116.397, 39.908];
     const map = new AMap.Map("map", {{ zoom: 11, center: initialCenter }});
     const markers = [];
-    locationsData.forEach((item) => {{
+
+    locationsData.forEach((item, idx) => {{
       const marker = new AMap.Marker({{
         position: [item.lng, item.lat],
         title: item.name,
@@ -90,9 +212,14 @@ def generate_map_html(locations: list[dict[str, Any]], amap_js_key: str, title: 
           direction: "top"
         }}
       }});
+      marker.on("click", () => handleMarkerClick(item, idx));
       markers.push(marker);
       map.add(marker);
     }});
+
+    // click blank area to clear
+    map.on("click", () => clearSelection());
+
     if (markers.length) map.setFitView(markers);
     renderTable();
   </script>

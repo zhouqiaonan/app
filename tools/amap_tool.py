@@ -4,6 +4,8 @@ from typing import Any
 import aiohttp
 import requests
 
+from tools.db_tool import get_cached_geocode, save_geocode, init_db
+
 
 class AMapClient:
     def __init__(self, web_key: str):
@@ -16,14 +18,30 @@ class AMapClient:
         return geocoded
 
     def _geocode_one(self, location: dict[str, Any]) -> dict[str, Any]:
+        address = location.get("address", "").strip()
+        # Check cache first
+        if address:
+            cached = get_cached_geocode(address)
+            if cached:
+                return {
+                    "name": location.get("name", "未命名"),
+                    "address": address,
+                    "lng": cached["lng"],
+                    "lat": cached["lat"],
+                }
+        # Not cached — call AMap API
         response = requests.get(
             "https://restapi.amap.com/v3/geocode/geo",
-            params={"address": location.get("address", ""), "key": self.web_key},
+            params={"address": address, "key": self.web_key},
             timeout=15,
         )
         response.raise_for_status()
         payload = response.json()
-        return self._parse_geocode_response(location, payload)
+        result = self._parse_geocode_response(location, payload)
+        # Save successful result to cache
+        if result.get("lng") is not None and address:
+            save_geocode(address, result["lng"], result["lat"])
+        return result
 
     async def async_geocode_addresses(
         self,
@@ -43,20 +61,34 @@ class AMapClient:
     async def _geocode_one_async(
         self, session: aiohttp.ClientSession, location: dict[str, Any]
     ) -> dict[str, Any]:
+        address = location.get("address", "").strip()
+        # Check cache first
+        if address:
+            cached = get_cached_geocode(address)
+            if cached:
+                return {
+                    "name": location.get("name", "未命名"),
+                    "address": address,
+                    "lng": cached["lng"],
+                    "lat": cached["lat"],
+                }
         try:
             async with session.get(
                 "https://restapi.amap.com/v3/geocode/geo",
-                params={"address": location.get("address", ""), "key": self.web_key},
+                params={"address": address, "key": self.web_key},
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as response:
                 response.raise_for_status()
                 payload = await response.json()
-                await asyncio.sleep(0.3)  # Rate limit: ~5 QPS per concurrent worker
-                return self._parse_geocode_response(location, payload)
+                await asyncio.sleep(0.2)
+                result = self._parse_geocode_response(location, payload)
+                if result.get("lng") is not None and address:
+                    save_geocode(address, result["lng"], result["lat"])
+                return result
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             return {
                 "name": location.get("name", "未命名"),
-                "address": location.get("address", ""),
+                "address": address,
                 "lng": None,
                 "lat": None,
                 "error": str(e),
@@ -64,7 +96,7 @@ class AMapClient:
         except Exception as e:
             return {
                 "name": location.get("name", "未命名"),
-                "address": location.get("address", ""),
+                "address": address,
                 "lng": None,
                 "lat": None,
                 "error": repr(e),

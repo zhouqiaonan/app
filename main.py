@@ -20,6 +20,8 @@ from services.auth import verify_api_key
 from tools.feishu_tool import FeishuClient
 
 settings = get_settings()
+from tools.db_tool import init_db
+init_db(settings.db_path)
 app = FastAPI(title="Feishu Map Agent", version="0.1.0")
 
 Path(settings.map_output_dir).mkdir(parents=True, exist_ok=True)
