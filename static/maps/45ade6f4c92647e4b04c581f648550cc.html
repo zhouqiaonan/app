@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工厂地址分布地图</title>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b8188cc629524337f4c686c90e8aa4a"></script>
+   <style>
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }
+    .header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+    .header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    .badge { font-size: 12px; color: #4b5563; background: #f3f4f6; border-radius: 999px; padding: 4px 10px; }
+    main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #map { width: 100%; flex: 1; min-height: 300px; }
+    .table-wrap { max-height: 35vh; overflow: auto; padding: 12px 16px; background: #f9fafb; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
+    h2 { margin: 0 0 8px; font-size: 14px; }
+    table { border-collapse: collapse; width: 100%; background: white; font-size: 13px; }
+    th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: center; white-space: nowrap; }
+    th { background: #1d4ed8; color: white; font-weight: 650; }
+    td:first-child { background: #f3f4f6; font-weight: 650; }
+    .near { color: #047857; }
+    .mid { color: #b45309; }
+    .far { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>工厂地址分布地图</h1>
+    <span class="badge">共 37 个地点</span>
+  </header>
+  <main>
+    <div id="map"></div>
+    <section class="table-wrap">
+      <h2>距离矩阵</h2>
+      <div id="distance-table"></div>
+    </section>
+  </main>
+  <script>
+    const locationsData = [{"address": "新厂：浙江省湖州市安吉县北山工业区", "lat": 30.744878, "lng": 119.785786, "name": "浩博"}, {"address": "浙江省嘉兴市桐乡市凤鸣街道高新西四路", "lat": 30.612038, "lng": 120.531624, "name": "维兹"}, {"address": "浙江省台州市临海市东塍镇上街村前洋东路", "lat": 28.926169, "lng": 121.279442, "name": "浙佳"}, {"address": "台州市路桥区峰江街道恒金产业园2期", "lat": 28.518414, "lng": 121.383573, "name": "倍趣"}, {"address": "浙江省台州市仙居县福应街道永安工业集聚区春晖中路", "lat": 28.878425, "lng": 120.826916, "name": "印象家居"}, {"address": "浙江省衢州市江山市虎山街道网营物联", "lat": 28.725518, "lng": 118.623892, "name": "东大海绵"}, {"address": "浙江省宁波市余姚市兰江街道肖东工业园区谭家岭西路", "lat": 30.019059, "lng": 121.125463, "name": "洽丰"}, {"address": "慈溪观海卫镇工业园东区", "lat": 30.151332, "lng": 121.442583, "name": "韩电集团"}, {"address": "(梅渚)浙江省绍兴市新昌县澄潭街道沃西大道", "lat": 29.476471, "lng": 120.792542, "name": "捷昌"}, {"address": "浙江省杭州市临平区恒毅街", "lat": 30.450304, "lng": 120.247023, "name": "欧伦"}, {"address": "浙江宁波奉化区滨海新区滨海大道", "lat": 29.533308, "lng": 121.504291, "name": "九丰"}, {"address": "宁波市象山县贤庠镇西泽塘工业区港航路", "lat": 29.610932, "lng": 121.862706, "name": "雷之声"}, {"address": "宁波市北仑区小港街道纬三路", "lat": 29.938672, "lng": 121.722015, "name": "梦浪"}, {"address": "浙江省丽水市缙云县壶镇镇浙江丽缙五金科技产业园", "lat": 28.803047, "lng": 120.250244, "name": "凌鲨"}, {"address": "浙江省永康龙山镇创四路", "lat": 29.036332, "lng": 120.227799, "name": "荣亚"}, {"address": "浙江省金华市武义县壶山街道黄龙工业区上松线", "lat": 28.883054, "lng": 119.77192, "name": "乐途"}, {"address": "浙江省海宁市盐官镇工业园区联红路", "lat": 30.415814, "lng": 120.562199, "name": "朝泓"}, {"address": "安徽省滁州市全椒县十字镇十谭工业园", "lat": 32.140305, "lng": 118.290262, "name": "德姆勒"}, {"address": "福建省漳州市南靖县靖城镇科技路", "lat": 24.57971, "lng": 117.510892, "name": "云紫星"}, {"address": "福建省福州市长乐区湖南镇鹏程路18号金山空港工业集中区", "lat": 25.949743, "lng": 119.668632, "name": "宇博"}, {"address": "广东省佛山市顺德区北滘镇黄龙村黄涌工业大道1号万洋科创园", "lat": 22.905158, "lng": 113.182501, "name": "因酷"}, {"address": "广东省中山市小榄镇东升社区东成路", "lat": 22.617806, "lng": 113.313929, "name": "持创"}, {"address": "广东省江门市蓬江区永达一路9号荣安工业园区", "lat": 22.618967, "lng": 113.062889, "name": "康百事"}, {"address": "广东省惠州市惠城区沥林镇亚伦集团有限公司", "lat": 22.981325, "lng": 114.221114, "name": "亚伦/唯物森林"}, {"address": "东莞市东实塘厦创智园", "lat": 22.808588, "lng": 114.051104, "name": "磊强"}, {"address": "江西省九江市修水县义宁镇芦良大道", "lat": 28.995288, "lng": 114.532359, "name": "伊启"}, {"address": "江苏省南通市启东牡丹西路", "lat": 31.792831, "lng": 121.65523, "name": "久誉远"}, {"address": "江苏省常州市武进区横林镇横洛东路", "lat": 31.680343, "lng": 120.103335, "name": "佳誉铂"}, {"address": "江苏省盐城市滨海县蔡桥镇科技产业园创新大道", "lat": 34.247533, "lng": 120.112958, "name": "复海"}, {"address": "江苏省张家港市金港镇晨丰公路", "lat": 31.930316, "lng": 120.459712, "name": "黑森林"}, {"address": "江苏省宿迁市宿城区经济开发区南京路", "lat": 33.763904, "lng": 118.200389, "name": "韩电"}, {"address": "山东枣庄市台儿庄区经济开发区台北路与广进路红绿灯西200米", "lat": 34.592079, "lng": 117.715535, "name": "福盈/嘉瑞宸"}, {"address": "山东省烟台市莱州市虎头崖镇西滕村", "lat": 37.13178, "lng": 119.888521, "name": "锐沃"}, {"address": "山东省莱州市城港路街道大原街", "lat": 37.235887, "lng": 119.930354, "name": "荣力"}, {"address": "（三厂）山东省潍坊市潍城区工业一街与彩虹路交叉口东", "lat": 36.743243, "lng": 119.029687, "name": "科霖"}, {"address": "山东省潍坊市寿光市洛城街道洛兴街与永宁路交叉口路北东侧350米", "lat": 36.860074, "lng": 118.860197, "name": "国森/大森木业"}, {"address": "河北省任丘市经济开发区北区林兴路北侧京南创新产业园", "lat": 41.683652, "lng": 115.672293, "name": "鑫迈众"}];
+
+    function formatDistance(meters) {
+      if (meters === 0) return "-";
+      return meters >= 1000 ? (meters / 1000).toFixed(1) + "km" : Math.round(meters) + "m";
+    }
+
+    function distanceClass(meters) {
+      if (meters > 0 && meters < 5000) return "near";
+      if (meters >= 5000 && meters < 20000) return "mid";
+      if (meters >= 20000) return "far";
+      return "";
+    }
+
+    function renderTable() {
+      const names = locationsData.map((item) => item.name);
+      let markup = "<table><thead><tr><th>地点</th>";
+      names.forEach((name) => markup += `<th>${name}</th>`);
+      markup += "</tr></thead><tbody>";
+      locationsData.forEach((row) => {
+        markup += `<tr><td>${row.name}</td>`;
+        locationsData.forEach((col) => {
+          const distance = row.distances[col.name] || 0;
+          markup += `<td class="${distanceClass(distance)}">${formatDistance(distance)}</td>`;
+        });
+        markup += "</tr>";
+      });
+      markup += "</tbody></table>";
+      document.getElementById("distance-table").innerHTML = markup;
+    }
+
+    const initialCenter = locationsData.length ? [locationsData[0].lng, locationsData[0].lat] : [116.397, 39.908];
+    const map = new AMap.Map("map", { zoom: 11, center: initialCenter });
+    const markers = [];
+    locationsData.forEach((item) => {
+      const marker = new AMap.Marker({
+        position: [item.lng, item.lat],
+        title: item.name,
+        label: {
+          content: `<div style="background:#fff;padding:3px 8px;border:1px solid #1d4ed8;border-radius:4px;font-size:12px;font-weight:700;">${item.name}</div>`,
+          direction: "top"
+        }
+      });
+      markers.push(marker);
+      map.add(marker);
+    });
+    if (markers.length) map.setFitView(markers);
+    renderTable();
+  </script>
+</body>
+</html>
