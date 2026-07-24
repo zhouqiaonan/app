@@ -87,24 +87,33 @@ def extract_chat_message(body: dict[str, Any]) -> dict[str, Any] | None:
     return {"event_id": event_id, "chat_id": chat_id, "text": text}
 
 
-def is_bot_message(body: dict[str, Any]) -> bool:
-    """判断消息事件是否来自机器人自身。
+# Chat-level cooldown: prevent processing messages from the same chat
+# within COOLDOWN seconds of the last response
+_chat_cooldowns: dict[str, float] = {}
+_COOLDOWN_SECONDS = 10
 
-    机器人自己发送的交互式卡片和富文本消息会再次触发 Webhook 回调，
-    必须过滤掉，否则形成死循环。通过 msg_type 字段进行简单启发式判断：
-    ``interactive``（卡片消息）和 ``post``（富文本）均为机器人发出。
 
-    Args:
-        body: 飞书 Webhook 回调的完整 JSON body。
-
-    Returns:
-        True 表示该消息来自机器人自身，需要跳过处理。
+def should_skip_chat(chat_id: str) -> bool:
+    """Check if a message from this chat should be skipped due to cooldown.
+    
+    After the bot sends a response, ignore incoming messages from the same
+    chat for COOLDOWN_SECONDS to prevent the bot's own messages from
+    triggering another webhook callback.
+    
+    Returns True if the message should be skipped.
     """
-    event = body.get("event", {})
-    message = event.get("message", {})
-    msg_type = message.get("msg_type", "")
-
-    if msg_type in ("interactive", "post"):
-        logger.info("跳过机器人自己的消息: msg_type=%s", msg_type)
+    now = time.time()
+    # Clean expired cooldowns
+    expired = [cid for cid, ts in _chat_cooldowns.items() if now - ts > _COOLDOWN_SECONDS]
+    for cid in expired:
+        del _chat_cooldowns[cid]
+    
+    if chat_id in _chat_cooldowns:
+        logger.info("冷却中，跳过消息: chat_id=%s", chat_id)
         return True
     return False
+
+
+def mark_chat_cooldown(chat_id: str) -> None:
+    """Mark a chat as being in cooldown after sending a response."""
+    _chat_cooldowns[chat_id] = time.time()

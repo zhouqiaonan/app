@@ -18,7 +18,7 @@ from agent_llm import run_chat_agent
 from config import get_settings
 from services.auth import verify_api_key
 from tools.feishu_tool import FeishuClient
-from services.feishu_webhook import handle_url_verification, extract_chat_message, is_duplicate_event, is_bot_message
+from services.feishu_webhook import handle_url_verification, extract_chat_message, is_duplicate_event, should_skip_chat, mark_chat_cooldown
 from services.feishu_reply import send_card_message, send_text_message
 
 settings = get_settings()
@@ -58,8 +58,8 @@ async def feishu_webhook(request: Request, background_tasks: BackgroundTasks):
     if not msg:
         return JSONResponse(content={}, status_code=200)
 
-    # 过滤机器人自己的消息，防止死循环
-    if is_bot_message(body):
+    # 冷却检查：同一个群聊短时间内不重复处理
+    if should_skip_chat(chat_id):
         return JSONResponse(content={}, status_code=200)
 
     event_id = msg.get("event_id", "")
@@ -105,6 +105,7 @@ def _process_feishu_message(chat_id: str, text: str) -> None:
         except Exception:
             wl.exception("发送文本消息失败")
 
+    mark_chat_cooldown(chat_id)
 
 class ManualRunRequest(BaseModel):
     app_token: str
