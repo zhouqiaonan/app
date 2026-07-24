@@ -106,11 +106,14 @@ def get_agent():
 # ---------------------------------------------------------------------------
 
 
-def _extract_map_url(messages: list[dict]) -> str | None:
-    """从 agent 消息历史中提取 render_map 返回的地图 URL。
+def _extract_map_info(messages: list[dict]) -> tuple[str | None, int]:
+    """从 agent 消息历史中提取 render_map 返回的地图 URL 和地点数量。
 
     遍历所有消息，查找 tool 角色中名为 render_map 的调用结果，
-    从中提取 url 字段。
+    从中提取 url 和 count 字段。
+    
+    Returns:
+        (url, count) — url 为 None 表示未找到，count 默认为 0。
     """
     for msg in messages:
         role = msg.get("role") or msg.get("type", "")
@@ -120,11 +123,11 @@ def _extract_map_url(messages: list[dict]) -> str | None:
                 try:
                     result = json.loads(content)
                     if isinstance(result, dict) and "url" in result:
-                        return result["url"]
+                        return result["url"], result.get("count", 0)
                 except json.JSONDecodeError:
                     logger.warning("render_map tool output is not valid JSON, skipping")
                     continue
-    return None
+    return None, 0
 
 
 def run_chat_agent(query: str, session_id: str | None = None) -> dict:
@@ -203,15 +206,15 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
                 reply = content.strip()
                 break
 
-    # 提取地图 URL
-    map_url = _extract_map_url(all_messages_dicts)
+    # 提取地图 URL 和地点数量
+    map_url, location_count = _extract_map_info(all_messages_dicts)
 
     return {
         "reply": reply,
         "map_url": map_url,
         "logs": logs,
         "error": "",
-        "success_count": 0,  # LLM path doesn't track count; render_map returns count separately
+        "success_count": location_count,
     }
 
 
