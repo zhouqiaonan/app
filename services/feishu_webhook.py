@@ -85,3 +85,26 @@ def extract_chat_message(body: dict[str, Any]) -> dict[str, Any] | None:
 
     logger.info("收到飞书消息: event_id=%s, chat_id=%s, text=%s", event_id, chat_id, text[:100])
     return {"event_id": event_id, "chat_id": chat_id, "text": text}
+
+
+def is_bot_message(body: dict[str, Any]) -> bool:
+    """判断消息事件是否来自机器人自身。
+
+    机器人自己发送的交互式卡片和富文本消息会再次触发 Webhook 回调，
+    必须过滤掉，否则形成死循环。通过 msg_type 字段进行简单启发式判断：
+    ``interactive``（卡片消息）和 ``post``（富文本）均为机器人发出。
+
+    Args:
+        body: 飞书 Webhook 回调的完整 JSON body。
+
+    Returns:
+        True 表示该消息来自机器人自身，需要跳过处理。
+    """
+    event = body.get("event", {})
+    message = event.get("message", {})
+    msg_type = message.get("msg_type", "")
+
+    if msg_type in ("interactive", "post"):
+        logger.info("跳过机器人自己的消息: msg_type=%s", msg_type)
+        return True
+    return False

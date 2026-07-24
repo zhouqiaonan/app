@@ -18,7 +18,7 @@ from agent_llm import run_chat_agent
 from config import get_settings
 from services.auth import verify_api_key
 from tools.feishu_tool import FeishuClient
-from services.feishu_webhook import handle_url_verification, extract_chat_message, is_duplicate_event
+from services.feishu_webhook import handle_url_verification, extract_chat_message, is_duplicate_event, is_bot_message
 from services.feishu_reply import send_card_message, send_text_message
 
 settings = get_settings()
@@ -56,6 +56,10 @@ async def feishu_webhook(request: Request, background_tasks: BackgroundTasks):
     # 提取消息
     msg = extract_chat_message(body)
     if not msg:
+        return JSONResponse(content={}, status_code=200)
+
+    # 过滤机器人自己的消息，防止死循环
+    if is_bot_message(body):
         return JSONResponse(content={}, status_code=200)
 
     event_id = msg.get("event_id", "")
