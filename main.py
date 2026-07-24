@@ -18,6 +18,8 @@ from agent_llm import run_chat_agent
 from config import get_settings
 from services.auth import verify_api_key
 from tools.feishu_tool import FeishuClient
+from services.feishu_webhook import handle_url_verification, extract_chat_message
+from services.feishu_reply import send_card_message, send_text_message
 
 settings = get_settings()
 from tools.db_tool import init_db
@@ -32,6 +34,58 @@ app.mount("/maps", StaticFiles(directory=settings.map_output_dir, html=True), na
 def chat_page():
     chat_html = Path(__file__).parent / "static" / "chat.html"
     return chat_html.read_text(encoding="utf-8")
+
+
+@app.post("/feishu/webhook")
+async def feishu_webhook(request: Request):
+    """飞书事件回调 Webhook。
+
+    处理飞书开放平台的 URL 验证和消息接收事件。
+    消息到达后调用 ReAct Agent 处理，并通过卡片或文本回复。
+    """
+    logger = logging.getLogger("feishu.webhook")
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={}, status_code=200)
+
+    # URL 验证（飞书首次配置时发送）
+    verification = handle_url_verification(body)
+    if verification:
+        return verification
+
+    # 提取消息
+    msg = extract_chat_message(body)
+    if not msg:
+        return JSONResponse(content={}, status_code=200)
+
+    chat_id = msg["chat_id"]
+    text = msg["text"]
+    logger.info("处理飞书消息: chat_id=%s", chat_id)
+
+    # 调用 Agent（chat_id 作为 session_id 实现多轮对话）
+    result = run_chat_agent(text, session_id=chat_id)
+
+    # 回复
+    map_url = result.get("map_url")
+    if map_url:
+        full_url = map_url if map_url.startswith("http") else f"{settings.public_base_url.rstrip('/')}/{map_url.lstrip('/')}"
+        try:
+            send_card_message(chat_id, "数据分布图", result.get("success_count", 0), full_url)
+        except Exception:
+            logger.exception("发送卡片消息失败")
+            try:
+                send_text_message(chat_id, f"地图已生成：{full_url}")
+            except Exception:
+                pass
+    else:
+        reply_text = result.get("reply", "抱歉，无法处理您的请求。")
+        try:
+            send_text_message(chat_id, reply_text)
+        except Exception:
+            logger.exception("发送文本消息失败")
+
+    return JSONResponse(content={}, status_code=200)
 
 
 class ManualRunRequest(BaseModel):

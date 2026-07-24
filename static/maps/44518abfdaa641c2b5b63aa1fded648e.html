@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工厂地址地图</title>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b8188cc629524337f4c686c90e8aa4a"></script>
+   <style>
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }
+    .header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+    .header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    .badge { font-size: 12px; color: #4b5563; background: #f3f4f6; border-radius: 999px; padding: 4px 10px; }
+    main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #map { width: 100%; flex: 1; min-height: 300px; }
+    .table-wrap { max-height: 35vh; overflow: auto; padding: 12px 16px; background: #f9fafb; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
+    h2 { margin: 0 0 8px; font-size: 14px; }
+    table { border-collapse: collapse; width: 100%; background: white; font-size: 13px; }
+    th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: center; white-space: nowrap; }
+    th { background: #1d4ed8; color: white; font-weight: 650; }
+    td:first-child { background: #f3f4f6; font-weight: 650; }
+    .near { color: #047857; }
+    .mid { color: #b45309; }
+    .far { color: #b91c1c; }
+    .highlight-row td { background: #dbeafe !important; }
+    .highlight-row td:first-child { background: #93c5fd !important; font-weight: 700; }
+    .iw-list { list-style: none; padding: 0; margin: 0; font-size: 13px; line-height: 1.8; }
+    .iw-list li { padding: 1px 0; white-space: nowrap; }
+    .iw-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
+    .iw-more { color: #9ca3af; font-size: 12px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>工厂地址地图</h1>
+    <span class="badge">共 8 个地点</span>
+  </header>
+  <main>
+    <div id="map"></div>
+    <section class="table-wrap">
+      <h2>距离矩阵</h2>
+      <div id="distance-table"></div>
+    </section>
+  </main>
+  <script>
+    const locationsData = [{"name": "浩博", "address": "浙江省湖州市安吉县北山工业区", "lng": 119.606089, "lat": 30.671071}, {"name": "维兹", "address": "浙江省嘉兴市桐乡市凤鸣街道高新西四路", "lng": 120.531624, "lat": 30.612038}, {"name": "浙佳", "address": "浙江省台州市临海市东塍镇上街村前洋东路", "lng": 121.279442, "lat": 28.926169}, {"name": "倍趣", "address": "台州市路桥区峰江街道恒金产业园2期", "lng": 121.383573, "lat": 28.518414}, {"name": "印象家居", "address": "浙江省台州市仙居县福应街道永安工业集聚区春晖中路", "lng": 120.826916, "lat": 28.878425}, {"name": "东大海绵", "address": "浙江省衢州市江山市虎山街道网营物联", "lng": 118.623892, "lat": 28.725518}, {"name": "洽丰", "address": "浙江省宁波市余姚市兰江街道肖东工业园区谭家岭西路", "lng": 121.125463, "lat": 30.019059}, {"name": "韩电集团", "address": "慈溪观海卫镇工业园东区", "lng": 121.442583, "lat": 30.151332}];
+
+    // ---- helpers ----
+    function formatDistance(meters) {
+      if (meters === 0) return "-";
+      return meters >= 1000 ? (meters / 1000).toFixed(1) + "km" : Math.round(meters) + "m";
+    }
+
+    function distanceClass(meters) {
+      if (meters > 0 && meters < 5000) return "near";
+      if (meters >= 5000 && meters < 20000) return "mid";
+      if (meters >= 20000) return "far";
+      return "";
+    }
+
+    function getDistColor(meters) {
+      if (meters > 0 && meters < 5000) return "#047857";
+      if (meters >= 5000 && meters < 20000) return "#b45309";
+      if (meters >= 20000) return "#b91c1c";
+      return "#6b7280";
+    }
+
+    function getLineWeight(meters) {
+      return meters < 5000 ? 3 : (meters < 20000 ? 2 : 1.5);
+    }
+
+    function findLocationByName(name) {
+      return locationsData.find(item => item.name === name) || null;
+    }
+
+    // ---- render table ----
+    function renderTable() {
+      const names = locationsData.map((item) => item.name);
+      let markup = "<table><thead><tr><th>地点</th>";
+      names.forEach((name) => markup += `<th>${name}</th>`);
+      markup += "</tr></thead><tbody>";
+      locationsData.forEach((row) => {
+        markup += `<tr id="row-${row.name.replace(/"/g,'&quot;')}"><td>${row.name}</td>`;
+        locationsData.forEach((col) => {
+          const distance = row.distances[col.name] || 0;
+          markup += `<td class="${distanceClass(distance)}">${formatDistance(distance)}</td>`;
+        });
+        markup += "</tr>";
+      });
+      markup += "</tbody></table>";
+      document.getElementById("distance-table").innerHTML = markup;
+    }
+
+    // ---- selection state ----
+    let activeOverlays = [];
+    let activeInfoWindow = null;
+    let selectedName = null;
+
+    function clearSelection() {
+      activeOverlays.forEach(o => map.remove(o));
+      activeOverlays = [];
+      if (activeInfoWindow) {
+        activeInfoWindow.close();
+        activeInfoWindow = null;
+      }
+      if (selectedName) {
+        const row = document.getElementById("row-" + selectedName.replace(/"/g, '&quot;'));
+        if (row) row.classList.remove("highlight-row");
+        selectedName = null;
+      }
+    }
+
+    // ---- build InfoWindow content ----
+    function buildInfoWindowContent(location, sortedDistances) {
+      const top7 = sortedDistances.slice(0, 7);
+      const totalOthers = sortedDistances.length - 7;
+      let items = top7.map(([name, dist]) => {
+        return `<li style="color:${getDistColor(dist)}">${name}&nbsp;&nbsp;${formatDistance(dist)}</li>`;
+      }).join("");
+      if (totalOthers > 0) {
+        items += `<li class="iw-more">...共 ${sortedDistances.length} 个其他地点</li>`;
+      }
+      return `<div class="iw-title">${location.name}</div><ul class="iw-list">${items}</ul>`;
+    }
+
+    // ---- draw polylines ----
+    function drawPolylines(origin, sortedDistances) {
+      const top7 = sortedDistances.slice(0, 7);
+      top7.forEach(([targetName, dist]) => {
+        const target = findLocationByName(targetName);
+        if (!target) return;
+        const color = getDistColor(dist);
+        const line = new AMap.Polyline({
+          path: [[origin.lng, origin.lat], [target.lng, target.lat]],
+          strokeColor: color,
+          strokeWeight: getLineWeight(dist),
+          strokeOpacity: 0.7,
+          lineJoin: 'round',
+        });
+        map.add(line);
+        activeOverlays.push(line);
+        const mid = [(origin.lng + target.lng) / 2, (origin.lat + target.lat) / 2];
+        const text = new AMap.Text({
+          text: formatDistance(dist),
+          position: mid,
+          style: { color: color, fontSize: '11px', fontWeight: '600', background: 'rgba(255,255,255,0.85)', padding: '1px 4px', borderRadius: '3px' }
+        });
+        map.add(text);
+        activeOverlays.push(text);
+      });
+    }
+
+    // ---- highlight table row ----
+    function highlightTableRow(name) {
+      const row = document.getElementById("row-" + name.replace(/"/g, '&quot;'));
+      if (row) {
+        row.classList.add("highlight-row");
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    // ---- marker click handler ----
+    function handleMarkerClick(location, index) {
+      if (selectedName === location.name) {
+        clearSelection();
+        return;
+      }
+      clearSelection();
+      selectedName = location.name;
+
+      const distances = location.distances || {};
+      const sorted = Object.entries(distances)
+        .filter(([name]) => name !== location.name)
+        .sort((a, b) => a[1] - b[1]);
+
+      // 1. draw polylines (top 5)
+      drawPolylines(location, sorted);
+
+      // 2. show InfoWindow
+      const content = buildInfoWindowContent(location, sorted);
+      activeInfoWindow = new AMap.InfoWindow({
+        content: content,
+        offset: new AMap.Pixel(0, -35),
+      });
+      activeInfoWindow.open(map, [location.lng, location.lat]);
+
+      // 3. highlight table
+      highlightTableRow(location.name);
+    }
+
+    // ---- init map ----
+    const initialCenter = locationsData.length ? [locationsData[0].lng, locationsData[0].lat] : [116.397, 39.908];
+    const map = new AMap.Map("map", { zoom: 11, center: initialCenter });
+    const markers = [];
+
+    locationsData.forEach((item, idx) => {
+      const marker = new AMap.Marker({
+        position: [item.lng, item.lat],
+        title: item.name,
+        label: {
+          content: `<div style="background:#fff;padding:3px 8px;border:1px solid #1d4ed8;border-radius:4px;font-size:12px;font-weight:700;">${item.name}</div>`,
+          direction: "top"
+        }
+      });
+      marker.on("click", () => handleMarkerClick(item, idx));
+      markers.push(marker);
+      map.add(marker);
+    });
+
+    // click blank area to clear
+    map.on("click", () => clearSelection());
+
+    if (markers.length) map.setFitView(markers);
+    renderTable();
+  </script>
+</body>
+</html>

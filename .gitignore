@@ -230,7 +230,8 @@ backoffice/mainapp/migrations/0001_initial.py
 
 node_modules
 package-lock.json
-/.env.*
+.env
+.env.*
 
 # secret files
 secrets/*

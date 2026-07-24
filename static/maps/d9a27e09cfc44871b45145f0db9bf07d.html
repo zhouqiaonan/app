@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工厂地址分布图</title>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b8188cc629524337f4c686c90e8aa4a"></script>
+   <style>
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2937; }
+    .header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+    .header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    .badge { font-size: 12px; color: #4b5563; background: #f3f4f6; border-radius: 999px; padding: 4px 10px; }
+    main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #map { width: 100%; flex: 1; min-height: 300px; }
+    .table-wrap { max-height: 35vh; overflow: auto; padding: 12px 16px; background: #f9fafb; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
+    h2 { margin: 0 0 8px; font-size: 14px; }
+    table { border-collapse: collapse; width: 100%; background: white; font-size: 13px; }
+    th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: center; white-space: nowrap; }
+    th { background: #1d4ed8; color: white; font-weight: 650; }
+    td:first-child { background: #f3f4f6; font-weight: 650; }
+    .near { color: #047857; }
+    .mid { color: #b45309; }
+    .far { color: #b91c1c; }
+    .highlight-row td { background: #dbeafe !important; }
+    .highlight-row td:first-child { background: #93c5fd !important; font-weight: 700; }
+    .iw-list { list-style: none; padding: 0; margin: 0; font-size: 13px; line-height: 1.8; }
+    .iw-list li { padding: 1px 0; white-space: nowrap; }
+    .iw-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
+    .iw-more { color: #9ca3af; font-size: 12px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>工厂地址分布图</h1>
+    <span class="badge">共 16 个地点</span>
+  </header>
+  <main>
+    <div id="map"></div>
+    <section class="table-wrap">
+      <h2>距离矩阵</h2>
+      <div id="distance-table"></div>
+    </section>
+  </main>
+  <script>
+    const locationsData = [{"name": "浩博", "address": "湖州安吉", "lng": 119.680261, "lat": 30.638803, "distances": {"浩博": 0, "维兹": 88788, "浙佳": 252413, "印象家居": 231549, "东大海绵": 236219, "洽丰": 162829, "韩电集团": 185350, "捷昌": 171083, "乐途": 207030, "朝泓": 82844, "德姆勒": 210244, "持创": 1108515, "久誉远": 212474, "佳誉铂": 108314, "复海": 390683, "鑫迈众": 1270653}}, {"name": "维兹", "address": "嘉兴桐乡", "lng": 120.565127, "lat": 30.630375, "distances": {"浩博": 88788, "维兹": 0, "浙佳": 200874, "印象家居": 194865, "东大海绵": 279233, "洽丰": 87160, "韩电集团": 101292, "捷昌": 128743, "乐途": 205767, "朝泓": 22015, "德姆勒": 272300, "持创": 1141674, "久誉远": 169288, "佳誉铂": 125588, "复海": 406152, "鑫迈众": 1305532}}, {"name": "浙佳", "address": "台州临海", "lng": 121.144625, "lat": 28.859042, "distances": {"浩博": 252413, "维兹": 200874, "浙佳": 0, "印象家居": 44370, "东大海绵": 259650, "洽丰": 122435, "韩电集团": 137143, "捷昌": 77316, "乐途": 146824, "朝泓": 179551, "德姆勒": 457871, "持创": 1061583, "久誉远": 320790, "佳誉铂": 326393, "复海": 601921, "鑫迈众": 1506146}}, {"name": "印象家居", "address": "台州仙居", "lng": 120.728733, "lat": 28.846856, "distances": {"浩博": 231549, "维兹": 194865, "浙佳": 44370, "印象家居": 0, "东大海绵": 215330, "洽丰": 130085, "韩电集团": 153567, "捷昌": 66583, "乐途": 102721, "朝泓": 172853, "德姆勒": 436547, "持创": 1024554, "久誉远": 333670, "佳誉铂": 319210, "复海": 600832, "鑫迈众": 1498003}}, {"name": "东大海绵", "address": "衢州江山", "lng": 118.627228, "lat": 28.73796, "distances": {"浩博": 236219, "维兹": 279233, "浙佳": 259650, "印象家居": 215330, "东大海绵": 0, "洽丰": 281854, "韩电集团": 315642, "捷昌": 226639, "乐途": 113223, "朝泓": 265443, "德姆勒": 381051, "持创": 862520, "久誉远": 448384, "佳誉铂": 357990, "复海": 630019, "鑫迈众": 1465359}}, {"name": "洽丰", "address": "宁波余姚", "lng": 121.154572, "lat": 30.037967, "distances": {"浩博": 162829, "维兹": 87160, "浙佳": 122435, "印象家居": 130085, "东大海绵": 281854, "洽丰": 0, "韩电集团": 33872, "捷昌": 68360, "乐途": 182020, "朝泓": 69824, "德姆勒": 358492, "持创": 1132174, "久誉远": 203607, "佳誉铂": 208910, "复海": 479744, "鑫迈众": 1386242}}, {"name": "韩电集团", "address": "宁波慈溪", "lng": 121.266525, "lat": 30.170695, "distances": {"浩博": 185350, "维兹": 101292, "浙佳": 137143, "印象家居": 153567, "东大海绵": 315642, "洽丰": 33872, "韩电集团": 0, "捷昌": 97797, "乐途": 214521, "朝泓": 89505, "德姆勒": 372674, "持创": 1164257, "久誉远": 183649, "佳誉铂": 212665, "复海": 472331, "鑫迈众": 1382740}}, {"name": "捷昌", "address": "新昌", "lng": 120.903918, "lat": 29.500525, "distances": {"浩博": 171083, "维兹": 128743, "浙佳": 77316, "印象家居": 66583, "东大海绵": 226639, "洽丰": 68360, "韩电集团": 97797, "捷昌": 0, "乐途": 119045, "朝泓": 106782, "德姆勒": 380557, "持创": 1067018, "久誉远": 270466, "佳誉铂": 253784, "复海": 534381, "鑫迈众": 1433449}}, {"name": "乐途", "address": "金华武义", "lng": 119.816341, "lat": 28.892562, "distances": {"浩博": 207030, "维兹": 205767, "浙佳": 146824, "印象家居": 102721, "东大海绵": 113223, "洽丰": 182020, "韩电集团": 214521, "捷昌": 119045, "乐途": 0, "朝泓": 186761, "德姆勒": 388994, "持创": 950200, "久誉远": 370590, "佳誉铂": 312667, "复海": 597376, "鑫迈众": 1470702}}, {"name": "朝泓", "address": "海宁盐官", "lng": 120.558247, "lat": 30.451674, "distances": {"浩博": 82844, "维兹": 22015, "浙佳": 179551, "印象家居": 172853, "东大海绵": 265443, "洽丰": 69824, "韩电集团": 89505, "捷昌": 106782, "乐途": 186761, "朝泓": 0, "德姆勒": 288753, "持创": 1127132, "久誉远": 185131, "佳誉铂": 147247, "复海": 428152, "鑫迈众": 1327187}}, {"name": "德姆勒", "address": "安徽滁州", "lng": 118.333439, "lat": 32.255904, "distances": {"浩博": 210244, "维兹": 272300, "浙佳": 457871, "印象家居": 436547, "东大海绵": 381051, "洽丰": 358492, "韩电集团": 372674, "捷昌": 380557, "乐途": 388994, "朝泓": 288753, "德姆勒": 0, "持创": 1166863, "久誉远": 319757, "佳誉铂": 178614, "复海": 289240, "鑫迈众": 1086241}}, {"name": "持创", "address": "广东中山", "lng": 113.392517, "lat": 22.517024, "distances": {"浩博": 1108515, "维兹": 1141674, "浙佳": 1061583, "印象家居": 1024554, "东大海绵": 862520, "洽丰": 1132174, "韩电集团": 1164257, "捷昌": 1067018, "乐途": 950200, "朝泓": 1127132, "德姆勒": 1166863, "持创": 0, "久誉远": 1310895, "佳誉铂": 1210353, "复海": 1453030, "鑫迈众": 2131385}}, {"name": "久誉远", "address": "江苏南通", "lng": 120.894522, "lat": 31.981269, "distances": {"浩博": 212474, "维兹": 169288, "浙佳": 320790, "印象家居": 333670, "东大海绵": 448384, "洽丰": 203607, "韩电集团": 183649, "捷昌": 270466, "乐途": 370590, "朝泓": 185131, "德姆勒": 319757, "持创": 1310895, "久誉远": 0, "佳誉铂": 147291, "复海": 308498, "鑫迈众": 1221405}}, {"name": "佳誉铂", "address": "江苏常州", "lng": 119.974092, "lat": 31.811313, "distances": {"浩博": 108314, "维兹": 125588, "浙佳": 326393, "印象家居": 319210, "东大海绵": 357990, "洽丰": 208910, "韩电集团": 212665, "捷昌": 253784, "乐途": 312667, "朝泓": 147247, "德姆勒": 178614, "持创": 1210353, "久誉远": 147291, "佳誉铂": 0, "复海": 285460, "鑫迈众": 1179955}}, {"name": "复海", "address": "江苏盐城", "lng": 120.16263, "lat": 33.348176, "distances": {"浩博": 390683, "维兹": 406152, "浙佳": 601921, "印象家居": 600832, "东大海绵": 630019, "洽丰": 479744, "韩电集团": 472331, "捷昌": 534381, "乐途": 597376, "朝泓": 428152, "德姆勒": 289240, "持创": 1453030, "久誉远": 308498, "佳誉铂": 285460, "复海": 0, "鑫迈众": 913569}}, {"name": "鑫迈众", "address": "河北任丘", "lng": 116.084412, "lat": 38.685325, "distances": {"浩博": 1270653, "维兹": 1305532, "浙佳": 1506146, "印象家居": 1498003, "东大海绵": 1465359, "洽丰": 1386242, "韩电集团": 1382740, "捷昌": 1433449, "乐途": 1470702, "朝泓": 1327187, "德姆勒": 1086241, "持创": 2131385, "久誉远": 1221405, "佳誉铂": 1179955, "复海": 913569, "鑫迈众": 0}}];
+
+    // ---- helpers ----
+    function formatDistance(meters) {
+      if (meters === 0) return "-";
+      return meters >= 1000 ? (meters / 1000).toFixed(1) + "km" : Math.round(meters) + "m";
+    }
+
+    function distanceClass(meters) {
+      if (meters > 0 && meters < 5000) return "near";
+      if (meters >= 5000 && meters < 20000) return "mid";
+      if (meters >= 20000) return "far";
+      return "";
+    }
+
+    function getDistColor(meters) {
+      if (meters > 0 && meters < 5000) return "#047857";
+      if (meters >= 5000 && meters < 20000) return "#b45309";
+      if (meters >= 20000) return "#b91c1c";
+      return "#6b7280";
+    }
+
+    function getLineWeight(meters) {
+      return meters < 5000 ? 3 : (meters < 20000 ? 2 : 1.5);
+    }
+
+    function findLocationByName(name) {
+      return locationsData.find(item => item.name === name) || null;
+    }
+
+    // ---- render table ----
+    function renderTable() {
+      const names = locationsData.map((item) => item.name);
+      let markup = "<table><thead><tr><th>地点</th>";
+      names.forEach((name) => markup += `<th>${name}</th>`);
+      markup += "</tr></thead><tbody>";
+      locationsData.forEach((row) => {
+        markup += `<tr id="row-${row.name.replace(/"/g,'&quot;')}"><td>${row.name}</td>`;
+        locationsData.forEach((col) => {
+          const distance = row.distances[col.name] || 0;
+          markup += `<td class="${distanceClass(distance)}">${formatDistance(distance)}</td>`;
+        });
+        markup += "</tr>";
+      });
+      markup += "</tbody></table>";
+      document.getElementById("distance-table").innerHTML = markup;
+    }
+
+    // ---- selection state ----
+    let activeOverlays = [];
+    let activeInfoWindow = null;
+    let selectedName = null;
+
+    function clearSelection() {
+      activeOverlays.forEach(o => map.remove(o));
+      activeOverlays = [];
+      if (activeInfoWindow) {
+        activeInfoWindow.close();
+        activeInfoWindow = null;
+      }
+      if (selectedName) {
+        const row = document.getElementById("row-" + selectedName.replace(/"/g, '&quot;'));
+        if (row) row.classList.remove("highlight-row");
+        selectedName = null;
+      }
+    }
+
+    // ---- build InfoWindow content ----
+    function buildInfoWindowContent(location, sortedDistances) {
+      const top7 = sortedDistances.slice(0, 7);
+      const totalOthers = sortedDistances.length - 7;
+      let items = top7.map(([name, dist]) => {
+        return `<li style="color:${getDistColor(dist)}">${name}&nbsp;&nbsp;${formatDistance(dist)}</li>`;
+      }).join("");
+      if (totalOthers > 0) {
+        items += `<li class="iw-more">...共 ${sortedDistances.length} 个其他地点</li>`;
+      }
+      return `<div class="iw-title">${location.name}</div><ul class="iw-list">${items}</ul>`;
+    }
+
+    // ---- draw polylines ----
+    function drawPolylines(origin, sortedDistances) {
+      const top7 = sortedDistances.slice(0, 7);
+      top7.forEach(([targetName, dist]) => {
+        const target = findLocationByName(targetName);
+        if (!target) return;
+        const color = getDistColor(dist);
+        const line = new AMap.Polyline({
+          path: [[origin.lng, origin.lat], [target.lng, target.lat]],
+          strokeColor: color,
+          strokeWeight: getLineWeight(dist),
+          strokeOpacity: 0.7,
+          lineJoin: 'round',
+        });
+        map.add(line);
+        activeOverlays.push(line);
+        const mid = [(origin.lng + target.lng) / 2, (origin.lat + target.lat) / 2];
+        const text = new AMap.Text({
+          text: formatDistance(dist),
+          position: mid,
+          style: { color: color, fontSize: '11px', fontWeight: '600', background: 'rgba(255,255,255,0.85)', padding: '1px 4px', borderRadius: '3px' }
+        });
+        map.add(text);
+        activeOverlays.push(text);
+      });
+    }
+
+    // ---- highlight table row ----
+    function highlightTableRow(name) {
+      const row = document.getElementById("row-" + name.replace(/"/g, '&quot;'));
+      if (row) {
+        row.classList.add("highlight-row");
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    // ---- marker click handler ----
+    function handleMarkerClick(location, index) {
+      if (selectedName === location.name) {
+        clearSelection();
+        return;
+      }
+      clearSelection();
+      selectedName = location.name;
+
+      const distances = location.distances || {};
+      const sorted = Object.entries(distances)
+        .filter(([name]) => name !== location.name)
+        .sort((a, b) => a[1] - b[1]);
+
+      // 1. draw polylines (top 5)
+      drawPolylines(location, sorted);
+
+      // 2. show InfoWindow
+      const content = buildInfoWindowContent(location, sorted);
+      activeInfoWindow = new AMap.InfoWindow({
+        content: content,
+        offset: new AMap.Pixel(0, -35),
+      });
+      activeInfoWindow.open(map, [location.lng, location.lat]);
+
+      // 3. highlight table
+      highlightTableRow(location.name);
+    }
+
+    // ---- init map ----
+    const initialCenter = locationsData.length ? [locationsData[0].lng, locationsData[0].lat] : [116.397, 39.908];
+    const map = new AMap.Map("map", { zoom: 11, center: initialCenter });
+    const markers = [];
+
+    locationsData.forEach((item, idx) => {
+      const marker = new AMap.Marker({
+        position: [item.lng, item.lat],
+        title: item.name,
+        label: {
+          content: `<div style="background:#fff;padding:3px 8px;border:1px solid #1d4ed8;border-radius:4px;font-size:12px;font-weight:700;">${item.name}</div>`,
+          direction: "top"
+        }
+      });
+      marker.on("click", () => handleMarkerClick(item, idx));
+      markers.push(marker);
+      map.add(marker);
+    });
+
+    // click blank area to clear
+    map.on("click", () => clearSelection());
+
+    if (markers.length) map.setFitView(markers);
+    renderTable();
+  </script>
+</body>
+</html>

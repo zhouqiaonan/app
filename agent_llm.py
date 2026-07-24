@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from config import get_settings
@@ -95,7 +96,7 @@ def get_agent():
         render_map,
     ]
 
-    _agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+    _agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT, checkpointer=MemorySaver())
     logger.info("ReAct agent 初始化完成（DeepSeek Chat）")
     return _agent
 
@@ -134,7 +135,7 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
 
     Args:
         query: 用户的自然语言请求
-        session_id: 会话 ID（预留，当前未使用）
+        session_id: 会话 ID，相同 ID 共享对话上下文。传入飞书的 chat_id 实现多轮对话。
 
     Returns:
         dict with keys:
@@ -154,6 +155,7 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
             "map_url": None,
             "logs": logs,
             "error": "未配置 DEEPSEEK_API_KEY，请在 .env 中设置",
+            "success_count": 0,
         }
 
     # 获取 agent
@@ -166,6 +168,7 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
             "map_url": None,
             "logs": logs,
             "error": f"初始化 agent 失败: {exc}",
+            "success_count": 0,
         }
 
     # 构建消息
@@ -173,7 +176,8 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
 
     # 调用 agent
     try:
-        result = agent.invoke({"messages": messages})
+        config = {"configurable": {"thread_id": session_id or "default"}}
+        result = agent.invoke({"messages": messages}, config)
     except Exception as exc:
         logger.exception("Agent 调用失败")
         return {
@@ -181,6 +185,7 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
             "map_url": None,
             "logs": logs,
             "error": f"Agent 调用失败: {exc}",
+            "success_count": 0,
         }
 
     # 提取回复和地图 URL
@@ -206,6 +211,7 @@ def run_chat_agent(query: str, session_id: str | None = None) -> dict:
         "map_url": map_url,
         "logs": logs,
         "error": "",
+        "success_count": 0,  # LLM path doesn't track count; render_map returns count separately
     }
 
 

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         if not self.feishu_app_tokens:
             logger.warning("FEISHU_APP_TOKENS is empty")
             return []
-        logger.info("FEISHU_APP_TOKENS raw: %s", self.feishu_app_tokens)
+        logger.info("FEISHU_APP_TOKENS configured (length=%d)", len(self.feishu_app_tokens))
         try:
             tokens = json.loads(self.feishu_app_tokens)
             if isinstance(tokens, list):
