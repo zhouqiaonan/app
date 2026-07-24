@@ -8,7 +8,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -37,11 +37,10 @@ def chat_page():
 
 
 @app.post("/feishu/webhook")
-async def feishu_webhook(request: Request):
+async def feishu_webhook(request: Request, background_tasks: BackgroundTasks):
     """飞书事件回调 Webhook。
 
-    处理飞书开放平台的 URL 验证和消息接收事件。
-    消息到达后调用 ReAct Agent 处理，并通过卡片或文本回复。
+    立即返回 200 给飞书（避免超时重试），消息处理在后台异步执行。
     """
     logger = logging.getLogger("feishu.webhook")
     try:
@@ -49,7 +48,7 @@ async def feishu_webhook(request: Request):
     except Exception:
         return JSONResponse(content={}, status_code=200)
 
-    # URL 验证（飞书首次配置时发送）
+    # URL 验证
     verification = handle_url_verification(body)
     if verification:
         return verification
@@ -63,24 +62,33 @@ async def feishu_webhook(request: Request):
     chat_id = msg["chat_id"]
     text = msg["text"]
 
-    # 去重：飞书 Webhook 可能重复投递同一事件
+    # 去重
     if is_duplicate_event(event_id):
         logger.info("跳过重复事件: event_id=%s", event_id)
         return JSONResponse(content={}, status_code=200)
 
-    logger.info("处理飞书消息: chat_id=%s, event_id=%s", chat_id, event_id)
+    logger.info("收到飞书消息: chat_id=%s, event_id=%s", chat_id, event_id)
 
-    # 调用 Agent（chat_id 作为 session_id 实现多轮对话）
+    # 后台处理 — 飞书立即得到 200 响应，不会重试
+    background_tasks.add_task(_process_feishu_message, chat_id, text)
+    return JSONResponse(content={}, status_code=200)
+
+
+def _process_feishu_message(chat_id: str, text: str) -> None:
+    """后台处理飞书消息：调用 Agent 并发送卡片回复。"""
+    wl = logging.getLogger("feishu.webhook")
+    wl.info("开始处理: chat_id=%s", chat_id)
+    
     result = run_chat_agent(text, session_id=chat_id)
 
-    # 回复
     map_url = result.get("map_url")
     if map_url:
         full_url = map_url if map_url.startswith("http") else f"{settings.public_base_url.rstrip('/')}/{map_url.lstrip('/')}"
         try:
             send_card_message(chat_id, "数据分布图", result.get("success_count", 0), full_url)
+            wl.info("卡片发送成功: chat_id=%s", chat_id)
         except Exception:
-            logger.exception("发送卡片消息失败")
+            wl.exception("发送卡片消息失败")
             try:
                 send_text_message(chat_id, f"地图已生成：{full_url}")
             except Exception:
@@ -89,10 +97,9 @@ async def feishu_webhook(request: Request):
         reply_text = result.get("reply", "抱歉，无法处理您的请求。")
         try:
             send_text_message(chat_id, reply_text)
+            wl.info("文本回复成功: chat_id=%s", chat_id)
         except Exception:
-            logger.exception("发送文本消息失败")
-
-    return JSONResponse(content={}, status_code=200)
+            wl.exception("发送文本消息失败")
 
 
 class ManualRunRequest(BaseModel):
