@@ -2,9 +2,33 @@
 
 import json
 import logging
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Event deduplication: store recently processed event_ids with timestamps
+# Feishu webhook may deliver the same event multiple times
+_recent_events: dict[str, float] = {}
+_EVENT_TTL = 300  # 5 minutes — clear old entries periodically
+
+
+def is_duplicate_event(event_id: str) -> bool:
+    """Check if an event has already been processed.
+
+    Feishu webhook has at-least-once delivery — same event may arrive twice.
+    Returns True if the event was already processed within the TTL window.
+    """
+    now = time.time()
+    # Clean expired entries
+    expired = [eid for eid, ts in _recent_events.items() if now - ts > _EVENT_TTL]
+    for eid in expired:
+        del _recent_events[eid]
+
+    if event_id in _recent_events:
+        return True
+    _recent_events[event_id] = now
+    return False
 
 
 def handle_url_verification(body: dict[str, Any]) -> dict[str, Any] | None:
@@ -35,6 +59,7 @@ def extract_chat_message(body: dict[str, Any]) -> dict[str, Any] | None:
         {"chat_id": str, "text": str} 或 None（非消息事件或解析失败）。
     """
     header = body.get("header", {})
+    event_id = header.get("event_id", "")
     event_type = header.get("event_type", "")
 
     if event_type != "im.message.receive_v1":
@@ -58,5 +83,5 @@ def extract_chat_message(body: dict[str, Any]) -> dict[str, Any] | None:
     if not text:
         return None
 
-    logger.info("收到飞书消息: chat_id=%s, text=%s", chat_id, text[:100])
-    return {"chat_id": chat_id, "text": text}
+    logger.info("收到飞书消息: event_id=%s, chat_id=%s, text=%s", event_id, chat_id, text[:100])
+    return {"event_id": event_id, "chat_id": chat_id, "text": text}

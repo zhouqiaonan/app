@@ -18,7 +18,7 @@ from agent_llm import run_chat_agent
 from config import get_settings
 from services.auth import verify_api_key
 from tools.feishu_tool import FeishuClient
-from services.feishu_webhook import handle_url_verification, extract_chat_message
+from services.feishu_webhook import handle_url_verification, extract_chat_message, is_duplicate_event
 from services.feishu_reply import send_card_message, send_text_message
 
 settings = get_settings()
@@ -59,9 +59,16 @@ async def feishu_webhook(request: Request):
     if not msg:
         return JSONResponse(content={}, status_code=200)
 
+    event_id = msg.get("event_id", "")
     chat_id = msg["chat_id"]
     text = msg["text"]
-    logger.info("处理飞书消息: chat_id=%s", chat_id)
+
+    # 去重：飞书 Webhook 可能重复投递同一事件
+    if is_duplicate_event(event_id):
+        logger.info("跳过重复事件: event_id=%s", event_id)
+        return JSONResponse(content={}, status_code=200)
+
+    logger.info("处理飞书消息: chat_id=%s, event_id=%s", chat_id, event_id)
 
     # 调用 Agent（chat_id 作为 session_id 实现多轮对话）
     result = run_chat_agent(text, session_id=chat_id)
