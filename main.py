@@ -58,13 +58,13 @@ async def feishu_webhook(request: Request, background_tasks: BackgroundTasks):
     if not msg:
         return JSONResponse(content={}, status_code=200)
 
-    # 冷却检查：同一个群聊短时间内不重复处理
-    if should_skip_chat(chat_id):
-        return JSONResponse(content={}, status_code=200)
-
     event_id = msg.get("event_id", "")
     chat_id = msg["chat_id"]
     text = msg["text"]
+
+    # 冷却检查：同一个群聊短时间内不重复处理
+    if should_skip_chat(chat_id):
+        return JSONResponse(content={}, status_code=200)
 
     # 去重
     if is_duplicate_event(event_id):
