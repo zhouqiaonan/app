@@ -1,7 +1,10 @@
+import logging
 import math
 from typing import Any
 
 from tools.db_tool import get_cached_distance, save_distance
+
+logger = logging.getLogger(__name__)
 
 
 def haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
@@ -29,6 +32,8 @@ def calculate_distance_matrix(locations: list[dict[str, Any]]) -> list[dict[str,
         if item.get("lng") is not None and item.get("lat") is not None
     ]
 
+    logger.info("calculate_distance_matrix: %d valid locations", len(valid))
+
     for origin in valid:
         origin["distances"] = {}
         for destination in valid:
@@ -46,6 +51,7 @@ def calculate_distance_matrix(locations: list[dict[str, Any]]) -> list[dict[str,
                 destination["lat"], destination["lng"],
             )
             origin["distances"][destination["name"]] = meters
+            logger.info("distance: %s -> %s = %dm", origin["name"], destination["name"], meters)
             save_distance(origin["name"], destination["name"], meters)
 
     return valid

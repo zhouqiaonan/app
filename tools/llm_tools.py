@@ -130,6 +130,10 @@ def render_map(locations: list[dict], title: str = "地址标注地图") -> dict
     settings = get_settings()
     task_id = uuid4().hex
     try:
+        # Auto-calculate distance matrix if not already present
+        if any("distances" not in loc for loc in locations):
+            logger.info("render_map: calculating distance matrix for %d locations", len(locations))
+            locations = calculate_distance_matrix(locations)
         html = generate_map_html(locations, settings.amap_js_key, title=title)
         write_map_html(html, task_id, settings.map_output_dir)
         url = f"{settings.public_base_url}/maps/{task_id}.html"

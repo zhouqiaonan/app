@@ -65,7 +65,8 @@ class FeishuClient:
             name_field, addr_field = None, None
 
         # TODO: 临时限制，后续移除
-        return [_record_to_location(item, name_field, addr_field) for item in items[:8]]
+        # return [_record_to_location(item, name_field, addr_field) for item in items[:8]]
+        return [_record_to_location(item, name_field, addr_field) for item in items]
 
     def list_tables(self, app_token: str) -> list[dict[str, Any]]:
         token = self.tenant_access_token()
